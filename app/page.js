@@ -4,7 +4,7 @@ import { CATEGORIES, mergeData, getRankings, computeOverall, computeBonus, hasDa
 
 const C = {
   orange:"#D17512",brightOrange:"#FE8909",tan:"#D4C9BA",brown:"#8F774D",
-  dark:"#342C29",darker:"#1e1a18",white:"#FEFEFE",
+  dark:"#4a3f38",darker:"#3a3028",white:"#FEFEFE",
 };
 const BAR_COLORS=["#FE8909","#D17512","#8F774D","#7a6540","#6b5a3e","#5c4e35","#4e432d","#403826","#342e1f","#2a251a","#221e15","#1a1810"];
 const SOURCE_COLORS={"hcp":"#FE8909","sheets":"#4CAF50","slack":"#8B74E8"};
