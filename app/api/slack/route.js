@@ -2,15 +2,22 @@ import { NextResponse } from 'next/server';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const CHANNEL_ID = process.env.SLACK_YARD_SIGNS_CHANNEL_ID;
-const TECH_SLACK_MAP = JSON.parse(process.env.TECH_SLACK_MAP || '{}');
 
-// Reverse map: slack username -> HCP tech name
-const SLACK_TO_TECH = Object.fromEntries(
-  Object.entries(TECH_SLACK_MAP).map(([hcp, slack]) => [slack.toLowerCase(), hcp])
-);
+function getTechMap() {
+  try {
+    return JSON.parse(process.env.TECH_SLACK_MAP || '{}');
+  } catch {
+    return {};
+  }
+}
 
 export async function GET(request) {
   try {
+    const TECH_SLACK_MAP = getTechMap();
+    const SLACK_TO_TECH = Object.fromEntries(
+      Object.entries(TECH_SLACK_MAP).map(([hcp, slack]) => [slack.toLowerCase(), hcp])
+    );
+
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
@@ -22,14 +29,12 @@ export async function GET(request) {
     const oldest = Math.floor(new Date(startDate).getTime() / 1000).toString();
     const latest = Math.floor(new Date(endDate + 'T23:59:59').getTime() / 1000).toString();
 
-    // Fetch all users in one call
     const usersRes = await fetch('https://slack.com/api/users.list', {
       headers: { Authorization: `Bearer ${SLACK_BOT_TOKEN}` },
     });
     const usersData = await usersRes.json();
     if (!usersData.ok) throw new Error(`Slack users.list error: ${usersData.error}`);
 
-    // Build userId -> HCP tech name map
     const userIdToTech = {};
     for (const member of usersData.members) {
       const username = member.name?.toLowerCase();
@@ -44,7 +49,6 @@ export async function GET(request) {
       }
     }
 
-    // Fetch messages from yard signs channel
     let allMessages = [];
     let cursor = undefined;
 
@@ -63,7 +67,6 @@ export async function GET(request) {
       cursor = data.response_metadata.next_cursor;
     }
 
-    // Count photo posts per tech
     const yardSigns = {};
     for (const msg of allMessages) {
       const hasPhoto = (msg.files && msg.files.some(f => f.mimetype?.startsWith('image/'))) ||
