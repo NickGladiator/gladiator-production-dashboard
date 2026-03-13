@@ -10,130 +10,154 @@ const BAR_COLORS=["#FE8909","#D17512","#8F774D","#7a6540","#6b5a3e","#5c4e35","#
 const SOURCE_COLORS={"hcp":"#FE8909","sheets":"#4CAF50","slack":"#8B74E8"};
 const SOURCE_LABELS={"hcp":"Housecall Pro","sheets":"Google Sheets","slack":"Slack"};
 
+function useIsMobile(){
+  const[m,setM]=useState(false);
+  useEffect(()=>{
+    const check=()=>setM(window.innerWidth<640);
+    check();
+    window.addEventListener("resize",check);
+    return()=>window.removeEventListener("resize",check);
+  },[]);
+  return m;
+}
+
 function parseLocal(str){const p=str.split("-").map(Number);return new Date(p[0],p[1]-1,p[2]);}
 function friendlyRange(s,e){if(!s||!e)return"";const a=parseLocal(s).toLocaleDateString("en-US",{month:"short",day:"numeric"});const b=parseLocal(e).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});return a+" - "+b;}
 function getMedal(r){return["🥇","🥈","🥉"][r]??`#${r+1}`;}
 
-function AnimatedBar({pct,color,delay=0}){
+function AnimatedBar({pct,color,delay=0,height=22}){
   const[w,setW]=useState(0);
   useEffect(()=>{const t=setTimeout(()=>setW(Math.max(pct,3)),delay);return()=>clearTimeout(t);},[pct,delay]);
-  return(<div style={{flex:1,height:22,background:"rgba(255,255,255,.06)",borderRadius:4,overflow:"hidden"}}><div style={{width:`${w}%`,height:"100%",background:color,borderRadius:4,transition:"width .6s cubic-bezier(.4,0,.2,1)"}}/></div>);
+  return(<div style={{flex:1,height,background:"rgba(255,255,255,.06)",borderRadius:4,overflow:"hidden"}}><div style={{width:`${w}%`,height:"100%",background:color,borderRadius:4,transition:"width .6s cubic-bezier(.4,0,.2,1)"}}/></div>);
 }
 
 function TitleSlide({dateRange}){
+  const mob=useIsMobile();
   return(<div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden",background:C.dark}}>
     <div style={{position:"absolute",top:0,left:0,right:0,height:5,background:`linear-gradient(90deg,${C.brightOrange},${C.orange})`}}/>
     <div style={{position:"absolute",bottom:0,left:0,right:0,height:5,background:`linear-gradient(90deg,${C.orange},${C.brightOrange})`}}/>
-    <div style={{fontSize:68,marginBottom:10}}>⚔️</div>
-    <div style={{fontFamily:"Georgia,serif",fontSize:52,fontWeight:"bold",color:C.brightOrange,letterSpacing:6,textTransform:"uppercase"}}>GLADIATOR</div>
-    <div style={{fontFamily:"Georgia,serif",fontSize:18,color:C.tan,letterSpacing:10,textTransform:"uppercase",marginTop:6}}>Exterior Services</div>
-    <div style={{marginTop:32,padding:"12px 36px",background:`linear-gradient(135deg,${C.orange},${C.brightOrange})`,borderRadius:6,color:C.white,fontSize:18,fontWeight:"bold",letterSpacing:3}}>PRODUCTION STANDINGS</div>
-    <div style={{marginTop:14,color:C.tan,fontSize:15,opacity:.75,letterSpacing:1}}>📅 {dateRange}</div>
+    <div style={{fontSize:mob?48:68,marginBottom:10}}>⚔️</div>
+    <div style={{fontFamily:"Georgia,serif",fontSize:mob?34:52,fontWeight:"bold",color:C.brightOrange,letterSpacing:mob?3:6,textTransform:"uppercase"}}>GLADIATOR</div>
+    <div style={{fontFamily:"Georgia,serif",fontSize:mob?13:18,color:C.tan,letterSpacing:mob?6:10,textTransform:"uppercase",marginTop:6}}>Exterior Services</div>
+    <div style={{marginTop:24,padding:mob?"10px 24px":"12px 36px",background:`linear-gradient(135deg,${C.orange},${C.brightOrange})`,borderRadius:6,color:C.white,fontSize:mob?14:18,fontWeight:"bold",letterSpacing:mob?2:3}}>PRODUCTION STANDINGS</div>
+    <div style={{marginTop:12,color:C.tan,fontSize:mob?12:15,opacity:.75,letterSpacing:1,textAlign:"center",padding:"0 20px"}}>📅 {dateRange}</div>
   </div>);
 }
 
 function CategorySlide({category,techs}){
+  const mob=useIsMobile();
   const noData=!hasData(techs,category.key);
   const ranked=getRankings(techs,category.key,category.higherIsBetter);
   const vals=ranked.map(t=>t[category.key]);
   const max=Math.max(...vals),min=Math.min(...vals),range=max-min||1;
-  const total=ranked.length,rowGap=total>8?5:9,fontSize=total>8?12:13;
+  const total=ranked.length;
+  const rowGap=mob?(total>8?3:5):(total>8?5:9);
+  const fontSize=mob?(total>8?10:11):(total>8?12:13);
+  const nameWidth=mob?90:140;
+  const valWidth=mob?(category.key==="callbackRate"?85:70):120;
   const srcColor=SOURCE_COLORS[category.source]||C.tan;
   function fmt(v,t){
     if(category.key==="tips")return`$${(v/100).toFixed(2)}`;
     if(category.key==="chargeRate")return`$${v.toFixed(0)}/hr`;
-    if(category.key==="callbackRate"){const jobs=t.jobsCompleted??0,cbs=t.callbacks??0;return`${v}% (${jobs}j / ${cbs}cb)`;}
+    if(category.key==="callbackRate"){
+      const jobs=t.jobsCompleted??0,cbs=t.callbacks??0;
+      return mob?`${v}% (${jobs}/${cbs})`:`${v}% (${jobs}j / ${cbs}cb)`;
+    }
     if(category.key==="upsellDollars")return`$${v.toFixed(2)}`;
     return v;
   }
-  return(<div style={{height:"100%",display:"flex",flexDirection:"column",padding:"20px 44px",boxSizing:"border-box",background:C.dark}}>
-    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,borderBottom:"1px solid rgba(255,255,255,.08)",paddingBottom:14}}>
-      <div style={{fontSize:32}}>{category.icon}</div>
-      <div style={{flex:1}}>
-        <div style={{fontFamily:"Georgia,serif",fontSize:26,fontWeight:"bold",color:C.brightOrange,textTransform:"uppercase",letterSpacing:2}}>{category.label}</div>
-        <div style={{color:C.tan,fontSize:11,opacity:.6,marginTop:1}}>{category.higherIsBetter?"↑ Higher is better":"↓ Lower is better"}</div>
+  return(<div style={{height:"100%",display:"flex",flexDirection:"column",padding:mob?"14px 16px":"20px 44px",boxSizing:"border-box",background:C.dark}}>
+    <div style={{display:"flex",alignItems:"center",gap:mob?8:12,marginBottom:mob?10:14,borderBottom:"1px solid rgba(255,255,255,.08)",paddingBottom:mob?10:14}}>
+      <div style={{fontSize:mob?22:32}}>{category.icon}</div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontFamily:"Georgia,serif",fontSize:mob?16:26,fontWeight:"bold",color:C.brightOrange,textTransform:"uppercase",letterSpacing:mob?1:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{category.label}</div>
+        <div style={{color:C.tan,fontSize:mob?9:11,opacity:.6,marginTop:1}}>{category.higherIsBetter?"↑ Higher is better":"↓ Lower is better"}</div>
       </div>
-      <div style={{padding:"4px 12px",background:"rgba(255,255,255,.05)",borderRadius:20,color:srcColor,fontSize:10,letterSpacing:1}}>{SOURCE_LABELS[category.source]}</div>
+      {!mob&&<div style={{padding:"4px 12px",background:"rgba(255,255,255,.05)",borderRadius:20,color:srcColor,fontSize:10,letterSpacing:1,whiteSpace:"nowrap"}}>{SOURCE_LABELS[category.source]}</div>}
     </div>
-    {noData?(<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,opacity:.4}}><div style={{fontSize:48}}>—</div><div style={{color:C.tan,fontSize:16,letterSpacing:2}}>NO DATA THIS WEEK</div></div>):(
+    {noData?(<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,opacity:.4}}><div style={{fontSize:40}}>—</div><div style={{color:C.tan,fontSize:mob?13:16,letterSpacing:2}}>NO DATA THIS WEEK</div></div>):(
       <div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"center",gap:rowGap}}>
         {ranked.map((t,i)=>{
           const pct=category.higherIsBetter?((t[category.key]-min)/range)*100:((max-t[category.key])/range)*100;
           const isFirst=t._rank===0,isLast=i===total-1;
-          return(<div key={t.name} style={{display:"flex",alignItems:"center",gap:10,opacity:isLast?0.55:1}}>
-            <div style={{width:30,fontSize:t._rank<3?16:fontSize,textAlign:"center",color:t._rank<3?C.white:"rgba(255,255,255,.45)",fontWeight:"bold"}}>{getMedal(t._rank)}</div>
-            <div style={{width:140,color:isFirst?C.brightOrange:C.white,fontSize,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.name}</div>
-            <AnimatedBar pct={Math.max(pct,3)} color={BAR_COLORS[t._rank]??"#1a1810"} delay={i*60}/>
-            <div style={{width:120,textAlign:"right",color:isFirst?C.brightOrange:C.white,fontWeight:isFirst?"bold":"normal",fontSize:isFirst?fontSize+2:fontSize}}>{fmt(t[category.key],t)}</div>
+          return(<div key={t.name} style={{display:"flex",alignItems:"center",gap:mob?6:10,opacity:isLast?0.55:1}}>
+            <div style={{width:mob?22:30,fontSize:t._rank<3?(mob?13:16):fontSize,textAlign:"center",color:t._rank<3?C.white:"rgba(255,255,255,.45)",fontWeight:"bold",flexShrink:0}}>{getMedal(t._rank)}</div>
+            <div style={{width:nameWidth,color:isFirst?C.brightOrange:C.white,fontSize,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>{t.name}</div>
+            <AnimatedBar pct={Math.max(pct,3)} color={BAR_COLORS[t._rank]??"#1a1810"} delay={i*60} height={mob?16:22}/>
+            <div style={{width:valWidth,textAlign:"right",color:isFirst?C.brightOrange:C.white,fontWeight:isFirst?"bold":"normal",fontSize:isFirst?fontSize+1:fontSize,flexShrink:0}}>{fmt(t[category.key],t)}</div>
           </div>);
         })}
       </div>
     )}
-    <div style={{marginTop:10,display:"flex",justifyContent:"space-between",color:C.tan,fontSize:10,opacity:.3}}><span>GLADIATOR EXTERIOR SERVICES</span><span>PRODUCTION STANDINGS</span></div>
+    <div style={{marginTop:8,display:"flex",justifyContent:"space-between",color:C.tan,fontSize:mob?8:10,opacity:.3}}><span>GLADIATOR EXTERIOR SERVICES</span><span>PRODUCTION STANDINGS</span></div>
   </div>);
 }
 
 function BonusSlide({techs}){
+  const mob=useIsMobile();
   const ranked=computeBonus(techs);
   const totalPayout=ranked.reduce((s,t)=>s+t.payout,0);
-  const maxPayout=ranked[0]?.payout||1,total=ranked.length,rowGap=total>8?5:9,fontSize=total>8?12:13;
-  return(<div style={{height:"100%",display:"flex",flexDirection:"column",padding:"20px 44px",boxSizing:"border-box",background:C.dark}}>
-    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,borderBottom:"1px solid rgba(255,255,255,.08)",paddingBottom:14}}>
-      <div style={{fontSize:32}}>💵</div>
+  const maxPayout=ranked[0]?.payout||1,total=ranked.length;
+  const rowGap=mob?(total>8?3:5):(total>8?5:9);
+  const fontSize=mob?(total>8?10:11):(total>8?12:13);
+  return(<div style={{height:"100%",display:"flex",flexDirection:"column",padding:mob?"14px 16px":"20px 44px",boxSizing:"border-box",background:C.dark}}>
+    <div style={{display:"flex",alignItems:"center",gap:mob?8:12,marginBottom:mob?10:14,borderBottom:"1px solid rgba(255,255,255,.08)",paddingBottom:mob?10:14}}>
+      <div style={{fontSize:mob?22:32}}>💵</div>
       <div style={{flex:1}}>
-        <div style={{fontFamily:"Georgia,serif",fontSize:26,fontWeight:"bold",color:C.brightOrange,textTransform:"uppercase",letterSpacing:2}}>P4P Bonus Payout</div>
-        <div style={{color:C.tan,fontSize:11,opacity:.6,marginTop:1}}>Performance dollars from P4P</div>
+        <div style={{fontFamily:"Georgia,serif",fontSize:mob?16:26,fontWeight:"bold",color:C.brightOrange,textTransform:"uppercase",letterSpacing:mob?1:2}}>P4P Bonus Payout</div>
+        <div style={{color:C.tan,fontSize:mob?9:11,opacity:.6,marginTop:1}}>Performance dollars from P4P</div>
       </div>
-      <div style={{textAlign:"right"}}>
-        <div style={{color:C.tan,fontSize:10,opacity:.5,letterSpacing:1}}>TOTAL PAYOUT</div>
-        <div style={{color:C.brightOrange,fontSize:22,fontWeight:"bold"}}>${totalPayout.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      <div style={{textAlign:"right",flexShrink:0}}>
+        <div style={{color:C.tan,fontSize:mob?9:10,opacity:.5,letterSpacing:1}}>TOTAL</div>
+        <div style={{color:C.brightOrange,fontSize:mob?16:22,fontWeight:"bold"}}>${totalPayout.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
       </div>
     </div>
     <div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"center",gap:rowGap}}>
       {ranked.map((t,i)=>{
         const pct=(t.payout/maxPayout)*100,isFirst=i===0,isLast=i===total-1;
-        return(<div key={t.name} style={{display:"flex",alignItems:"center",gap:10,opacity:isLast?0.55:1}}>
-          <div style={{width:30,fontSize:i<3?16:fontSize,textAlign:"center",color:i<3?C.white:"rgba(255,255,255,.45)",fontWeight:"bold"}}>{getMedal(i)}</div>
-          <div style={{width:140,color:isFirst?C.brightOrange:C.white,fontSize,fontWeight:isFirst?"bold":"normal"}}>{t.name}</div>
-          <AnimatedBar pct={Math.max(pct,3)} color={BAR_COLORS[i]??"#1a1810"} delay={i*60}/>
-          <div style={{width:130,textAlign:"right"}}><span style={{color:isFirst?C.brightOrange:C.white,fontWeight:isFirst?"bold":"normal",fontSize:isFirst?fontSize+2:fontSize}}>${t.payout.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>
+        return(<div key={t.name} style={{display:"flex",alignItems:"center",gap:mob?6:10,opacity:isLast?0.55:1}}>
+          <div style={{width:mob?22:30,fontSize:i<3?(mob?13:16):fontSize,textAlign:"center",color:i<3?C.white:"rgba(255,255,255,.45)",fontWeight:"bold",flexShrink:0}}>{getMedal(i)}</div>
+          <div style={{width:mob?90:140,color:isFirst?C.brightOrange:C.white,fontSize,fontWeight:isFirst?"bold":"normal",flexShrink:0,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.name}</div>
+          <AnimatedBar pct={Math.max(pct,3)} color={BAR_COLORS[i]??"#1a1810"} delay={i*60} height={mob?16:22}/>
+          <div style={{width:mob?80:130,textAlign:"right",flexShrink:0}}><span style={{color:isFirst?C.brightOrange:C.white,fontWeight:isFirst?"bold":"normal",fontSize:isFirst?fontSize+1:fontSize}}>${t.payout.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>
         </div>);
       })}
     </div>
-    <div style={{marginTop:10,display:"flex",justifyContent:"space-between",color:C.tan,fontSize:10,opacity:.3}}><span>GLADIATOR EXTERIOR SERVICES</span><span>PRODUCTION STANDINGS</span></div>
+    <div style={{marginTop:8,display:"flex",justifyContent:"space-between",color:C.tan,fontSize:mob?8:10,opacity:.3}}><span>GLADIATOR EXTERIOR SERVICES</span><span>PRODUCTION STANDINGS</span></div>
   </div>);
 }
 
 function OverallSlide({techs}){
+  const mob=useIsMobile();
   const ranked=computeOverall(techs);
   const active=ranked.filter(t=>t.active),inactive=ranked.filter(t=>!t.active);
   const[show,setShow]=useState(false);
   useEffect(()=>{setShow(false);const t=setTimeout(()=>setShow(true),150);return()=>clearTimeout(t);},[]);
-  const total=active.length,fontSize=total>8?12:14,rowGap=total>8?6:10;
-  return(<div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px 56px",boxSizing:"border-box",position:"relative",background:C.dark}}>
+  const total=active.length,fontSize=mob?(total>8?10:12):(total>8?12:14),rowGap=mob?(total>8?5:7):(total>8?6:10);
+  return(<div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:mob?"16px 20px":"20px 56px",boxSizing:"border-box",position:"relative",background:C.dark}}>
     <div style={{position:"absolute",top:0,left:0,right:0,height:5,background:`linear-gradient(90deg,${C.brightOrange},${C.orange})`}}/>
-    <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:20}}>
-      <div style={{fontSize:48,transition:"transform .6s",transform:show?"scale(1)":"scale(0.4)"}}>🏆</div>
+    <div style={{display:"flex",alignItems:"center",gap:mob?10:16,marginBottom:mob?12:20}}>
+      <div style={{fontSize:mob?36:48,transition:"transform .6s",transform:show?"scale(1)":"scale(0.4)"}}>🏆</div>
       <div>
-        <div style={{fontSize:11,color:C.tan,letterSpacing:4,textTransform:"uppercase",opacity:.6}}>Overall Best Tech</div>
-        <div style={{fontFamily:"Georgia,serif",fontSize:36,fontWeight:"bold",color:C.brightOrange,transition:"opacity .6s, transform .6s",opacity:show?1:0,transform:show?"translateY(0)":"translateY(16px)"}}>{active[0]?.name??"—"}</div>
+        <div style={{fontSize:mob?9:11,color:C.tan,letterSpacing:3,textTransform:"uppercase",opacity:.6}}>Overall Best Tech</div>
+        <div style={{fontFamily:"Georgia,serif",fontSize:mob?24:36,fontWeight:"bold",color:C.brightOrange,transition:"opacity .6s, transform .6s",opacity:show?1:0,transform:show?"translateY(0)":"translateY(16px)"}}>{active[0]?.name??"—"}</div>
       </div>
     </div>
-    <div style={{width:"70%",display:"flex",flexDirection:"column",gap:rowGap}}>
+    <div style={{width:mob?"100%":"70%",display:"flex",flexDirection:"column",gap:rowGap}}>
       {active.map((item,i)=>{
         const isFirst=i===0,pct=(item.pts/active[0].pts)*100;
-        return(<div key={item.name} style={{display:"flex",alignItems:"center",gap:10,transition:`opacity .4s ${i*50}ms, transform .4s ${i*50}ms`,opacity:show?1:0,transform:show?"translateX(0)":"translateX(-20px)"}}>
-          <div style={{width:30,fontSize:i<3?16:fontSize,textAlign:"center",color:i<3?C.white:"rgba(255,255,255,.4)"}}>{getMedal(i)}</div>
-          <div style={{width:140,color:isFirst?C.brightOrange:C.white,fontSize,fontWeight:isFirst?"bold":"normal"}}>{item.name}</div>
-          <AnimatedBar pct={Math.max(pct,3)} color={isFirst?C.brightOrange:BAR_COLORS[i]??"#1a1810"} delay={i*50}/>
-          <div style={{width:50,textAlign:"right",color:isFirst?C.brightOrange:C.tan,fontSize,opacity:isFirst?1:.7}}>{item.pts} pts</div>
+        return(<div key={item.name} style={{display:"flex",alignItems:"center",gap:mob?6:10,transition:`opacity .4s ${i*50}ms, transform .4s ${i*50}ms`,opacity:show?1:0,transform:show?"translateX(0)":"translateX(-20px)"}}>
+          <div style={{width:mob?22:30,fontSize:i<3?(mob?13:16):fontSize,textAlign:"center",color:i<3?C.white:"rgba(255,255,255,.4)",flexShrink:0}}>{getMedal(i)}</div>
+          <div style={{width:mob?100:140,color:isFirst?C.brightOrange:C.white,fontSize,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>{item.name}</div>
+          <AnimatedBar pct={Math.max(pct,3)} color={isFirst?C.brightOrange:BAR_COLORS[i]??"#1a1810"} delay={i*50} height={mob?14:22}/>
+          <div style={{width:mob?40:50,textAlign:"right",color:isFirst?C.brightOrange:C.tan,fontSize,opacity:isFirst?1:.7,flexShrink:0}}>{item.pts}pt</div>
         </div>);
       })}
-      {inactive.length>0&&(<div style={{marginTop:8,borderTop:"1px solid rgba(255,255,255,.08)",paddingTop:8,display:"flex",flexWrap:"wrap",gap:6}}>
-        {inactive.map(t=>(<div key={t.name} style={{color:C.tan,fontSize:11,opacity:.3,padding:"2px 8px",border:"1px solid rgba(255,255,255,.08)",borderRadius:3}}>{t.name}</div>))}
+      {inactive.length>0&&(<div style={{marginTop:6,borderTop:"1px solid rgba(255,255,255,.08)",paddingTop:6,display:"flex",flexWrap:"wrap",gap:4}}>
+        {inactive.map(t=>(<div key={t.name} style={{color:C.tan,fontSize:mob?9:11,opacity:.3,padding:"2px 6px",border:"1px solid rgba(255,255,255,.08)",borderRadius:3}}>{t.name}</div>))}
       </div>)}
     </div>
-    <div style={{marginTop:20,padding:"7px 22px",border:"1px solid rgba(254,137,9,.3)",borderRadius:4,color:C.orange,fontSize:11,letterSpacing:2}}>KEEP PUSHING ⚔️</div>
+    <div style={{marginTop:mob?12:20,padding:"6px 18px",border:"1px solid rgba(254,137,9,.3)",borderRadius:4,color:C.orange,fontSize:mob?10:11,letterSpacing:2}}>KEEP PUSHING ⚔️</div>
   </div>);
 }
 
@@ -145,7 +169,7 @@ function DashboardCard({category,techs}){
   function fmt(v,t){
     if(category.key==="tips")return`$${(v/100).toFixed(2)}`;
     if(category.key==="chargeRate")return`$${v.toFixed(0)}/hr`;
-    if(category.key==="callbackRate")return`${v}% (${t.jobsCompleted??0}j/${t.callbacks??0}cb)`;
+    if(category.key==="callbackRate")return`${v}% (${t.jobsCompleted??0}/${t.callbacks??0})`;
     if(category.key==="upsellDollars")return`$${v.toFixed(2)}`;
     return v;
   }
@@ -156,16 +180,16 @@ function DashboardCard({category,techs}){
     </div>
     {noData?(<div style={{color:C.tan,fontSize:11,opacity:.4,textAlign:"center",padding:"10px 0"}}>No data</div>):(
       <div style={{display:"flex",flexDirection:"column",gap:6}}>
-        {ranked.map((t,i)=>{
+        {ranked.map((t)=>{
           const pct=category.higherIsBetter?((t[category.key]-min)/range)*100:((max-t[category.key])/range)*100;
           const isFirst=t._rank===0;
           return(<div key={t.name} style={{display:"flex",alignItems:"center",gap:6}}>
-            <div style={{width:20,fontSize:t._rank<3?12:10,textAlign:"center"}}>{getMedal(t._rank)}</div>
-            <div style={{width:110,fontSize:11,color:isFirst?C.brightOrange:C.white,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.name}</div>
+            <div style={{width:20,fontSize:t._rank<3?12:10,textAlign:"center",flexShrink:0}}>{getMedal(t._rank)}</div>
+            <div style={{width:110,fontSize:11,color:isFirst?C.brightOrange:C.white,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>{t.name}</div>
             <div style={{flex:1,height:6,background:"rgba(255,255,255,.06)",borderRadius:3,overflow:"hidden"}}>
               <div style={{width:`${Math.max(pct,3)}%`,height:"100%",background:BAR_COLORS[t._rank]??"#1a1810",borderRadius:3}}/>
             </div>
-            <div style={{width:90,textAlign:"right",fontSize:11,color:isFirst?C.brightOrange:C.tan}}>{fmt(t[category.key],t)}</div>
+            <div style={{width:80,textAlign:"right",fontSize:11,color:isFirst?C.brightOrange:C.tan,flexShrink:0}}>{fmt(t[category.key],t)}</div>
           </div>);
         })}
       </div>
@@ -174,30 +198,32 @@ function DashboardCard({category,techs}){
 }
 
 function Dashboard({data,onBack}){
+  const mob=useIsMobile();
   const{techs,dateRange}=data;
   const overall=computeOverall(techs);
   const active=overall.filter(t=>t.active);
   return(<div style={{minHeight:"100vh",background:C.darker,fontFamily:"system-ui,sans-serif"}}>
-    <div style={{background:C.dark,borderBottom:"1px solid rgba(255,255,255,.08)",padding:"12px 24px",display:"flex",alignItems:"center",gap:16}}>
-      <span style={{fontSize:24}}>⚔️</span>
+    <div style={{background:C.dark,borderBottom:"1px solid rgba(255,255,255,.08)",padding:mob?"10px 16px":"12px 24px",display:"flex",alignItems:"center",gap:12}}>
+      <span style={{fontSize:mob?20:24}}>⚔️</span>
       <div>
-        <div style={{fontFamily:"Georgia,serif",color:C.brightOrange,fontWeight:"bold",fontSize:18,letterSpacing:2}}>GLADIATOR</div>
-        <div style={{color:C.tan,fontSize:11,opacity:.6}}>📅 {dateRange}</div>
+        <div style={{fontFamily:"Georgia,serif",color:C.brightOrange,fontWeight:"bold",fontSize:mob?15:18,letterSpacing:2}}>GLADIATOR</div>
+        <div style={{color:C.tan,fontSize:mob?10:11,opacity:.6}}>📅 {dateRange}</div>
       </div>
       <div style={{flex:1}}/>
-      {active[0]&&(<div style={{textAlign:"right"}}>
+      {active[0]&&!mob&&(<div style={{textAlign:"right"}}>
         <div style={{color:C.tan,fontSize:10,opacity:.5,letterSpacing:1}}>🏆 OVERALL LEADER</div>
         <div style={{color:C.brightOrange,fontWeight:"bold",fontSize:16}}>{active[0].name}</div>
       </div>)}
-      <button onClick={onBack} style={{padding:"6px 14px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",borderRadius:4,color:C.tan,fontSize:12,cursor:"pointer"}}>← Back</button>
+      <button onClick={onBack} style={{padding:mob?"5px 10px":"6px 14px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",borderRadius:4,color:C.tan,fontSize:mob?11:12,cursor:"pointer"}}>← Back</button>
     </div>
-    <div style={{padding:24,display:"grid",gridTemplateColumns:"repeat(auto-fill, minmax(340px, 1fr))",gap:16}}>
+    <div style={{padding:mob?12:24,display:"grid",gridTemplateColumns:mob?"1fr":"repeat(auto-fill, minmax(340px, 1fr))",gap:mob?10:16}}>
       {CATEGORIES.map(cat=><DashboardCard key={cat.key} category={cat} techs={techs}/>)}
     </div>
   </div>);
 }
 
 function SetupScreen({onGenerate}){
+  const mob=useIsMobile();
   const today=new Date();
   const fmt=d=>d.toISOString().slice(0,10);
   const[start,setStart]=useState(fmt(new Date(today.getFullYear(),today.getMonth(),1)));
@@ -230,32 +256,32 @@ function SetupScreen({onGenerate}){
   };
 
   const modeBtn=(val,icon,label,desc)=>(
-    <div onClick={()=>setMode(val)} style={{flex:1,padding:"14px 12px",borderRadius:7,border:`2px solid ${mode===val?C.brightOrange:"rgba(255,255,255,.1)"}`,background:mode===val?"rgba(254,137,9,.1)":"rgba(255,255,255,.03)",cursor:"pointer",textAlign:"center"}}>
-      <div style={{fontSize:28,marginBottom:4}}>{icon}</div>
-      <div style={{color:mode===val?C.brightOrange:C.white,fontWeight:"bold",fontSize:13}}>{label}</div>
-      <div style={{color:C.tan,fontSize:11,opacity:.6,marginTop:3}}>{desc}</div>
+    <div onClick={()=>setMode(val)} style={{flex:1,padding:mob?"12px 8px":"14px 12px",borderRadius:7,border:`2px solid ${mode===val?C.brightOrange:"rgba(255,255,255,.1)"}`,background:mode===val?"rgba(254,137,9,.1)":"rgba(255,255,255,.03)",cursor:"pointer",textAlign:"center"}}>
+      <div style={{fontSize:mob?22:28,marginBottom:4}}>{icon}</div>
+      <div style={{color:mode===val?C.brightOrange:C.white,fontWeight:"bold",fontSize:mob?12:13}}>{label}</div>
+      <div style={{color:C.tan,fontSize:mob?10:11,opacity:.6,marginTop:3}}>{desc}</div>
     </div>
   );
 
-  return(<div style={{minHeight:"100vh",background:C.darker,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:40,fontFamily:"system-ui,sans-serif"}}>
-    <div style={{fontSize:48,marginBottom:6}}>⚔️</div>
-    <div style={{fontFamily:"Georgia,serif",fontSize:32,fontWeight:"bold",color:C.brightOrange,letterSpacing:3,marginBottom:2}}>GLADIATOR</div>
-    <div style={{color:C.tan,fontSize:12,letterSpacing:4,marginBottom:32,opacity:.7}}>PRODUCTION MEETING GENERATOR</div>
-    <div style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",borderRadius:10,padding:32,maxWidth:480,width:"100%",display:"flex",flexDirection:"column",gap:20}}>
+  return(<div style={{minHeight:"100vh",background:C.darker,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:mob?"24px 16px":40,fontFamily:"system-ui,sans-serif"}}>
+    <div style={{fontSize:mob?38:48,marginBottom:6}}>⚔️</div>
+    <div style={{fontFamily:"Georgia,serif",fontSize:mob?26:32,fontWeight:"bold",color:C.brightOrange,letterSpacing:3,marginBottom:2}}>GLADIATOR</div>
+    <div style={{color:C.tan,fontSize:mob?10:12,letterSpacing:mob?2:4,marginBottom:mob?20:32,opacity:.7,textAlign:"center"}}>PRODUCTION MEETING GENERATOR</div>
+    <div style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",borderRadius:10,padding:mob?"20px 16px":32,maxWidth:480,width:"100%",display:"flex",flexDirection:"column",gap:mob?16:20}}>
       <div>
         <div style={{color:C.brightOrange,fontSize:11,letterSpacing:3,fontWeight:"bold",marginBottom:10}}>📅 SELECT DATE RANGE</div>
-        <div style={{display:"flex",gap:12,alignItems:"center"}}>
+        <div style={{display:"flex",gap:10,alignItems:"center"}}>
           <div style={{flex:1}}>
             <label style={{color:C.tan,fontSize:11,display:"block",marginBottom:4,opacity:.6}}>FROM</label>
-            <input type="date" value={start} onChange={e=>setStart(e.target.value)} style={{width:"100%",padding:"10px 12px",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.15)",borderRadius:5,color:C.white,fontSize:14,boxSizing:"border-box",colorScheme:"dark"}}/>
+            <input type="date" value={start} onChange={e=>setStart(e.target.value)} style={{width:"100%",padding:"10px 12px",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.15)",borderRadius:5,color:C.white,fontSize:mob?13:14,boxSizing:"border-box",colorScheme:"dark"}}/>
           </div>
           <div style={{color:C.tan,marginTop:16,opacity:.4}}>→</div>
           <div style={{flex:1}}>
             <label style={{color:C.tan,fontSize:11,display:"block",marginBottom:4,opacity:.6}}>TO</label>
-            <input type="date" value={end} onChange={e=>setEnd(e.target.value)} style={{width:"100%",padding:"10px 12px",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.15)",borderRadius:5,color:C.white,fontSize:14,boxSizing:"border-box",colorScheme:"dark"}}/>
+            <input type="date" value={end} onChange={e=>setEnd(e.target.value)} style={{width:"100%",padding:"10px 12px",background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.15)",borderRadius:5,color:C.white,fontSize:mob?13:14,boxSizing:"border-box",colorScheme:"dark"}}/>
           </div>
         </div>
-        {range&&(<div style={{marginTop:10,padding:"8px 12px",background:"rgba(254,137,9,.08)",borderRadius:5,border:"1px solid rgba(254,137,9,.2)",color:C.brightOrange,fontSize:13,textAlign:"center"}}>📅 {range}</div>)}
+        {range&&(<div style={{marginTop:10,padding:"8px 12px",background:"rgba(254,137,9,.08)",borderRadius:5,border:"1px solid rgba(254,137,9,.2)",color:C.brightOrange,fontSize:mob?12:13,textAlign:"center"}}>📅 {range}</div>)}
       </div>
       <div>
         <div style={{color:C.brightOrange,fontSize:11,letterSpacing:3,fontWeight:"bold",marginBottom:10}}>🎯 SELECT VIEW</div>
@@ -266,7 +292,7 @@ function SetupScreen({onGenerate}){
       </div>
       {error&&<div style={{color:"#ff6b6b",fontSize:13,padding:"10px 14px",background:"rgba(255,107,107,.1)",borderRadius:5,border:"1px solid rgba(255,107,107,.2)"}}>⚠️ {error}</div>}
       {status&&<div style={{color:C.tan,fontSize:13,textAlign:"center",opacity:.7}}>⏳ {status}</div>}
-      <button onClick={generate} disabled={!!status} style={{padding:"16px 0",background:status?"rgba(254,137,9,.3)":`linear-gradient(135deg,${C.orange},${C.brightOrange})`,border:"none",borderRadius:6,color:C.white,fontSize:17,fontWeight:"bold",cursor:status?"not-allowed":"pointer",letterSpacing:2,boxShadow:status?"none":"0 4px 20px rgba(254,137,9,.3)"}}>
+      <button onClick={generate} disabled={!!status} style={{padding:"16px 0",background:status?"rgba(254,137,9,.3)":`linear-gradient(135deg,${C.orange},${C.brightOrange})`,border:"none",borderRadius:6,color:C.white,fontSize:mob?15:17,fontWeight:"bold",cursor:status?"not-allowed":"pointer",letterSpacing:2,boxShadow:status?"none":"0 4px 20px rgba(254,137,9,.3)"}}>
         {status?"Loading...":"⚔️ GENERATE STANDINGS"}
       </button>
     </div>
@@ -274,6 +300,7 @@ function SetupScreen({onGenerate}){
 }
 
 function Slideshow({data,onBack}){
+  const mob=useIsMobile();
   const{techs,dateRange}=data;
   const total=CATEGORIES.length+3;
   const[slide,setSlide]=useState(0);
@@ -281,6 +308,17 @@ function Slideshow({data,onBack}){
   const[dir,setDir]=useState(1);
   const go=useCallback((n)=>{if(n<0||n>=total)return;setDir(n>slide?1:-1);setSlide(n);setAnimKey(k=>k+1);},[slide,total]);
   useEffect(()=>{const h=e=>{if(e.key==="ArrowRight"||e.key==="ArrowDown")go(slide+1);if(e.key==="ArrowLeft"||e.key==="ArrowUp")go(slide-1);};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[go,slide]);
+
+  // Swipe support for mobile
+  const[touchX,setTouchX]=useState(null);
+  const onTouchStart=e=>setTouchX(e.touches[0].clientX);
+  const onTouchEnd=e=>{
+    if(touchX===null)return;
+    const dx=e.changedTouches[0].clientX-touchX;
+    if(Math.abs(dx)>40){dx<0?go(slide+1):go(slide-1);}
+    setTouchX(null);
+  };
+
   const slideNames=["Intro",...CATEGORIES.map(c=>c.label),"P4P Bonus","Overall"];
   const slides=[
     <TitleSlide key="title" dateRange={dateRange}/>,
@@ -289,21 +327,21 @@ function Slideshow({data,onBack}){
     <OverallSlide key="overall" techs={techs}/>,
   ];
   return(<div style={{height:"100vh",background:C.darker,display:"flex",flexDirection:"column",fontFamily:"system-ui,sans-serif"}}>
-    <div style={{flex:1,position:"relative",overflow:"hidden"}}>
+    <div style={{flex:1,position:"relative",overflow:"hidden"}} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <div key={animKey} style={{height:"100%",animation:`slideIn${dir>0?"Right":"Left"} 0.35s cubic-bezier(.4,0,.2,1) forwards`}}>{slides[slide]}</div>
-      {slide>0&&(<button onClick={()=>go(slide-1)} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",background:"rgba(0,0,0,.45)",border:"1px solid rgba(255,255,255,.15)",borderRadius:"50%",width:42,height:42,color:C.white,fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>)}
-      {slide<total-1&&(<button onClick={()=>go(slide+1)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"rgba(0,0,0,.45)",border:"1px solid rgba(255,255,255,.15)",borderRadius:"50%",width:42,height:42,color:C.white,fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>)}
+      {!mob&&slide>0&&(<button onClick={()=>go(slide-1)} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",background:"rgba(0,0,0,.45)",border:"1px solid rgba(255,255,255,.15)",borderRadius:"50%",width:42,height:42,color:C.white,fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>)}
+      {!mob&&slide<total-1&&(<button onClick={()=>go(slide+1)} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",background:"rgba(0,0,0,.45)",border:"1px solid rgba(255,255,255,.15)",borderRadius:"50%",width:42,height:42,color:C.white,fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>)}
     </div>
-    <div style={{background:"#1a1512",borderTop:"1px solid rgba(255,255,255,.08)",padding:"10px 20px",display:"flex",alignItems:"center",gap:12}}>
-      <button onClick={onBack} style={{padding:"6px 14px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",borderRadius:4,color:C.tan,fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}}>← Change Dates</button>
-      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+    <div style={{background:"#1a1512",borderTop:"1px solid rgba(255,255,255,.08)",padding:mob?"8px 12px":"10px 20px",display:"flex",alignItems:"center",gap:mob?8:12}}>
+      <button onClick={onBack} style={{padding:mob?"5px 8px":"6px 14px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",borderRadius:4,color:C.tan,fontSize:mob?10:12,cursor:"pointer",whiteSpace:"nowrap"}}>← Back</button>
+      {!mob&&<div style={{display:"flex",gap:8,alignItems:"center"}}>
         {Object.entries(SOURCE_LABELS).map(([key,label])=>(<div key={key} style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:7,height:7,borderRadius:"50%",background:SOURCE_COLORS[key]}}/><span style={{color:C.tan,fontSize:10,opacity:.45}}>{label}</span></div>))}
+      </div>}
+      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:mob?4:5}}>
+        {slideNames.map((name,i)=>(<div key={i} onClick={()=>go(i)} title={name} style={{width:i===slide?(mob?16:22):(mob?6:8),height:mob?6:8,borderRadius:4,background:i===slide?C.brightOrange:"rgba(255,255,255,.18)",transition:"all .25s",cursor:"pointer"}}/>))}
       </div>
-      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
-        {slideNames.map((name,i)=>(<div key={i} onClick={()=>go(i)} title={name} style={{width:i===slide?22:8,height:8,borderRadius:4,background:i===slide?C.brightOrange:"rgba(255,255,255,.18)",transition:"all .25s",cursor:"pointer"}}/>))}
-      </div>
-      <div style={{color:C.tan,fontSize:12,opacity:.4,whiteSpace:"nowrap"}}>{slideNames[slide]} · {slide+1}/{total}</div>
-      <div style={{color:C.tan,fontSize:11,opacity:.25,whiteSpace:"nowrap"}}>← → keys</div>
+      <div style={{color:C.tan,fontSize:mob?10:12,opacity:.4,whiteSpace:"nowrap"}}>{slide+1}/{total}</div>
+      {!mob&&<div style={{color:C.tan,fontSize:11,opacity:.25,whiteSpace:"nowrap"}}>← → keys</div>}
     </div>
     <style>{`@keyframes slideInRight{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}@keyframes slideInLeft{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:translateX(0)}}`}</style>
   </div>);
