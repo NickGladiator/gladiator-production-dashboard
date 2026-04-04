@@ -157,6 +157,21 @@ function OverallSlide({techs}){
         {inactive.map(t=>(<div key={t.name} style={{color:C.tan,fontSize:mob?9:11,opacity:.3,padding:"2px 6px",border:"1px solid rgba(255,255,255,.08)",borderRadius:3}}>{t.name}</div>))}
       </div>)}
     </div>
+    {active[0]&&(()=>{
+      const winner=active[0];
+      const topCats=CATEGORIES.filter(cat=>{
+        const ranked=getRankings(active,cat.key,cat.higherIsBetter);
+        const hasAny=ranked.some(t=>t[cat.key]!==null&&t[cat.key]!==0&&t[cat.key]!==undefined);
+        if(!hasAny)return false;
+        const pos=ranked.findIndex(t=>t.name===winner.name);
+        return pos===0;
+      }).map(cat=>cat.label);
+      return topCats.length>0&&(
+        <div style={{marginTop:mob?8:12,padding:"8px 16px",background:"rgba(254,137,9,.08)",border:"1px solid rgba(254,137,9,.2)",borderRadius:6,color:C.tan,fontSize:mob?10:12,textAlign:"center",maxWidth:mob?"100%":"60%"}}>
+          🏆 Won by leading in: <strong style={{color:C.brightOrange}}>{topCats.join(", ")}</strong>
+        </div>
+      );
+    })()}
     <div style={{marginTop:mob?12:20,padding:"6px 18px",border:"1px solid rgba(254,137,9,.3)",borderRadius:4,color:C.orange,fontSize:mob?10:11,letterSpacing:2}}>KEEP PUSHING ⚔️</div>
   </div>);
 }
@@ -249,6 +264,17 @@ function Dashboard({data,onBack}){
       {active[0]&&!mob&&(<div style={{textAlign:"right"}}>
         <div style={{color:C.tan,fontSize:10,opacity:.5,letterSpacing:1}}>🏆 OVERALL LEADER</div>
         <div style={{color:C.brightOrange,fontWeight:"bold",fontSize:16}}>{active[0].name}</div>
+        {(()=>{
+          const winner=active[0];
+          const topCats=CATEGORIES.filter(cat=>{
+            const ranked=getRankings(active,cat.key,cat.higherIsBetter);
+            const hasAny=ranked.some(t=>t[cat.key]!==null&&t[cat.key]!==0&&t[cat.key]!==undefined);
+            if(!hasAny)return false;
+            const pos=ranked.findIndex(t=>t.name===winner.name);
+            return pos===0;
+          }).map(cat=>cat.label);
+          return topCats.length>0&&<div style={{color:C.tan,fontSize:10,opacity:.6}}>Led: {topCats.join(", ")}</div>;
+        })()}
       </div>)}
       <button onClick={onBack} style={{padding:mob?"5px 10px":"6px 14px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",borderRadius:4,color:C.tan,fontSize:mob?11:12,cursor:"pointer"}}>← Back</button>
     </div>
