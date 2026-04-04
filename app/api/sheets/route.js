@@ -100,7 +100,7 @@ function parseTips(rows, startDate, endDate) {
     if (!tech || SKIP_NAMES.includes(tech.toLowerCase())) continue;
     const date = parseSheetDate(row.c[0].v);
     if (!date || date < startDate || date > endDate) continue;
-    const amount = parseMoney(row.c[4]?.v ?? row.c[3]?.v);
+    const amount = parseMoney(row.c[4]?.v);
     totals[tech] = (totals[tech] || 0) + amount;
   }
   return totals;
