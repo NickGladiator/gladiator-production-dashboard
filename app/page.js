@@ -355,11 +355,11 @@ function Slideshow({data,onBack}){
     setTouchX(null);
   };
 
-  const slideNames=["Intro",...CATEGORIES.map(c=>c.label),"P4P Bonus","Overall"];
+  const slideNames=["Intro",...CATEGORIES.map(c=>c.label),"Overall"];
   const slides=[
     <TitleSlide key="title" dateRange={dateRange}/>,
     ...CATEGORIES.map(cat=><CategorySlide key={cat.key} category={cat} techs={techs}/>),
-    <BonusSlide key="bonus" techs={techs}/>,
+,
     <OverallSlide key="overall" techs={techs}/>,
   ];
   return(<div style={{height:"100vh",background:C.darker,display:"flex",flexDirection:"column",fontFamily:"system-ui,sans-serif"}}>
