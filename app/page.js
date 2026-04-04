@@ -156,7 +156,19 @@ function OverallSlide({techs}){
       <div style={{position:"absolute",top:0,left:0,right:0,height:5,background:`linear-gradient(90deg,${C.brightOrange},${C.orange})`}}/>
       <div style={{fontSize:mob?48:72,marginBottom:8}}>🏆</div>
       <div style={{fontSize:mob?11:14,color:C.tan,letterSpacing:3,textTransform:"uppercase",opacity:.6,marginBottom:4}}>Overall Best Tech</div>
-      <div style={{fontFamily:"Georgia,serif",fontSize:mob?28:48,fontWeight:"bold",color:C.brightOrange,marginBottom:mob?16:24}}>{active[0]?.name??"—"}</div>
+      <div style={{fontFamily:"Georgia,serif",fontSize:mob?28:48,fontWeight:"bold",color:C.brightOrange,marginBottom:mob?8:12}}>{active[0]?.name??"—"}</div>
+      {active[0]&&(()=>{
+        const winner=active[0];
+        const topCats=CATEGORIES.filter(cat=>{
+          const activeTechs=techs.filter(t=>t.jobsCompleted>0||t.hoursWorked>0);
+          const hasAny=activeTechs.some(t=>t[cat.key]!==null&&t[cat.key]!==0&&t[cat.key]!==undefined);
+          if(!hasAny)return false;
+          const r=getRankings(activeTechs,cat.key,cat.higherIsBetter);
+          return r[0]?.name===winner.name;
+        }).map(c=>c.label);
+        if(topCats.length===0)return null;
+        return <div style={{fontSize:mob?11:14,color:C.tan,marginBottom:mob?12:20,textAlign:"center"}}>Led in: <strong style={{color:C.brightOrange}}>{topCats.join(", ")}</strong></div>;
+      })()}
       <div style={{width:mob?"100%":"60%",display:"flex",flexDirection:"column",gap:mob?6:8}}>
         {active.map((item,i)=>{
           const isFirst=i===0;
