@@ -171,12 +171,48 @@ function DashboardCard({category,techs}){
     if(category.key==="chargeRate")return`$${v.toFixed(0)}/hr`;
     if(category.key==="callbackRate")return`${v}% (${t.jobsCompleted??0}/${t.callbacks??0})`;
     if(category.key==="upsellDollars")return`$${v.toFixed(2)}`;
+    if(category.key==="p4pBonus")return`$${v.toFixed(2)}`;
     return v;
   }
+  function companyTotal(){
+    if(category.key==="callbackRate"){
+      const totalJobs=techs.reduce((s,t)=>s+(t.jobsCompleted??0),0);
+      const totalCbs=techs.reduce((s,t)=>s+(t.callbacks??0),0);
+      const rate=totalJobs>0?Math.round((totalCbs/totalJobs)*100):0;
+      return`${rate}% (${totalJobs} jobs / ${totalCbs} callbacks)`;
+    }
+    if(category.key==="tips"){
+      const total=techs.reduce((s,t)=>s+(t.tips??0),0);
+      return`$${total.toFixed(2)}`;
+    }
+    if(category.key==="upsellDollars"){
+      const total=techs.reduce((s,t)=>s+(t.upsellDollars??0),0);
+      return`$${total.toFixed(2)}`;
+    }
+    if(category.key==="p4pBonus"){
+      const total=techs.reduce((s,t)=>s+(t.p4pBonus??0),0);
+      return`$${total.toFixed(2)}`;
+    }
+    if(category.key==="yardSigns"){
+      const total=techs.reduce((s,t)=>s+(t.yardSigns??0),0);
+      return`${total} signs`;
+    }
+    if(category.key==="sickDays"){
+      const total=techs.reduce((s,t)=>s+(t.sickDays??0),0);
+      return`${total} days`;
+    }
+    if(category.key==="reviews"){
+      const total=techs.reduce((s,t)=>s+(t.reviews??0),0);
+      return`${total} reviews`;
+    }
+    return null;
+  }
+  const total=companyTotal();
   return(<div style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",borderRadius:8,padding:"14px 16px"}}>
-    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:10}}>
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6,borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:8}}>
       <span style={{fontSize:18}}>{category.icon}</span>
       <span style={{color:C.brightOrange,fontWeight:"bold",fontSize:12,letterSpacing:1,textTransform:"uppercase"}}>{category.label}</span>
+      {total&&<span style={{marginLeft:"auto",color:C.tan,fontSize:11,opacity:.7}}>Total: <strong style={{color:C.white}}>{total}</strong></span>}
     </div>
     {noData?(<div style={{color:C.tan,fontSize:11,opacity:.4,textAlign:"center",padding:"10px 0"}}>No data</div>):(
       <div style={{display:"flex",flexDirection:"column",gap:6}}>
