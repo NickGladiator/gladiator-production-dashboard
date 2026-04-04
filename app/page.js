@@ -273,6 +273,7 @@ function Dashboard({data,onBack}){
   const{techs,dateRange}=data;
   const overall=computeOverall(techs);
   const active=overall.filter(t=>t.active);
+  const scoreMap=Object.fromEntries(overall.map(t=>[t.name,t.pts??0]));
   return(<div style={{minHeight:"100vh",background:C.darker,fontFamily:"system-ui,sans-serif"}}>
     <div style={{background:C.dark,borderBottom:"1px solid rgba(255,255,255,.08)",padding:mob?"10px 16px":"12px 24px",display:"flex",alignItems:"center",gap:12}}>
       <span style={{fontSize:mob?20:24}}>⚔️</span>
@@ -299,6 +300,21 @@ function Dashboard({data,onBack}){
       <button onClick={onBack} style={{padding:mob?"5px 10px":"6px 14px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",borderRadius:4,color:C.tan,fontSize:mob?11:12,cursor:"pointer"}}>← Back</button>
     </div>
     <div style={{padding:mob?12:24,display:"grid",gridTemplateColumns:mob?"1fr":"repeat(auto-fill, minmax(340px, 1fr))",gap:mob?10:16}}>
+      <div style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",borderRadius:8,padding:"14px 16px",gridColumn:mob?"1":"1/-1"}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10,borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:10}}>
+          <span style={{fontSize:18}}>🏆</span>
+          <span style={{color:C.brightOrange,fontWeight:"bold",fontSize:12,letterSpacing:1,textTransform:"uppercase"}}>Overall Standings</span>
+        </div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:mob?6:10}}>
+          {overall.filter(t=>t.active).map((t,i)=>(
+            <div key={t.name} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 10px",background:"rgba(255,255,255,.04)",borderRadius:6,border:`1px solid ${i===0?"rgba(254,137,9,.4)":"rgba(255,255,255,.08)"}`}}>
+              <span style={{fontSize:12}}>{getMedal(i)}</span>
+              <span style={{color:i===0?C.brightOrange:C.white,fontSize:12,fontWeight:i===0?"bold":"normal"}}>{t.name}</span>
+              <span style={{color:C.tan,fontSize:11,opacity:.6}}>{t.pts}pt</span>
+            </div>
+          ))}
+        </div>
+      </div>
       {CATEGORIES.map(cat=><DashboardCard key={cat.key} category={cat} techs={techs}/>)}
     </div>
   </div>);
