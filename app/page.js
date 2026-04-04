@@ -150,50 +150,36 @@ function OverallSlide({techs}){
   const active=ranked.filter(t=>t.active);
   const inactive=ranked.filter(t=>!t.active);
   const maxPts=active[0]?.pts||1;
-  const winner=active[0];
   const fontSize=mob?12:14;
-  const rowGap=mob?6:10;
-  const winnerCats=winner?CATEGORIES.filter(cat=>{
-    const activeTechs=techs.filter(t=>t.jobsCompleted>0||t.hoursWorked>0);
-    const hasAny=activeTechs.some(t=>t[cat.key]!==null&&t[cat.key]!==0&&t[cat.key]!==undefined);
-    if(!hasAny)return false;
-    const r=getRankings(activeTechs,cat.key,cat.higherIsBetter);
-    return r[0]?.name===winner.name;
-  }).map(c=>c.label):[];
   return(
     <div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:mob?"16px 20px":"20px 56px",boxSizing:"border-box",background:C.dark,position:"relative"}}>
       <div style={{position:"absolute",top:0,left:0,right:0,height:5,background:`linear-gradient(90deg,${C.brightOrange},${C.orange})`}}/>
-      <div style={{display:"flex",alignItems:"center",gap:mob?10:16,marginBottom:mob?8:16}}>
-        <div style={{fontSize:mob?36:48}}>🏆</div>
-        <div>
-          <div style={{fontSize:mob?9:11,color:C.tan,letterSpacing:3,textTransform:"uppercase",opacity:.6}}>Overall Best Tech</div>
-          <div style={{fontFamily:"Georgia,serif",fontSize:mob?24:36,fontWeight:"bold",color:C.brightOrange}}>{winner?.name??"—"}</div>
-          {winnerCats.length>0&&<div style={{fontSize:mob?10:12,color:C.tan,marginTop:4}}>Led: <strong style={{color:C.brightOrange}}>{winnerCats.join(", ")}</strong></div>}
-        </div>
-      </div>
-      <div style={{width:mob?"100%":"70%",display:"flex",flexDirection:"column",gap:rowGap}}>
+      <div style={{fontSize:mob?48:72,marginBottom:8}}>🏆</div>
+      <div style={{fontSize:mob?11:14,color:C.tan,letterSpacing:3,textTransform:"uppercase",opacity:.6,marginBottom:4}}>Overall Best Tech</div>
+      <div style={{fontFamily:"Georgia,serif",fontSize:mob?28:48,fontWeight:"bold",color:C.brightOrange,marginBottom:mob?16:24}}>{active[0]?.name??"—"}</div>
+      <div style={{width:mob?"100%":"60%",display:"flex",flexDirection:"column",gap:mob?6:8}}>
         {active.map((item,i)=>{
           const isFirst=i===0;
           const pts=item.pts??0;
-          const pct=maxPts>0?(pts/maxPts)*100:100;
+          const pct=maxPts>0?(pts/maxPts)*100:3;
           return(
-            <div key={item.name} style={{display:"flex",alignItems:"center",gap:mob?6:10}}>
-              <div style={{width:mob?22:30,fontSize:i<3?(mob?13:16):fontSize,textAlign:"center",color:i<3?C.white:"rgba(255,255,255,.4)",flexShrink:0}}>{getMedal(i)}</div>
-              <div style={{width:mob?100:140,color:isFirst?C.brightOrange:C.white,fontSize,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>{item.name}</div>
-              <div style={{flex:1,height:mob?14:22,background:"rgba(255,255,255,.06)",borderRadius:4,overflow:"hidden"}}>
+            <div key={item.name} style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:30,textAlign:"center",fontSize:i<3?16:fontSize,color:i<3?C.white:"rgba(255,255,255,.4)",flexShrink:0}}>{getMedal(i)}</div>
+              <div style={{width:140,color:isFirst?C.brightOrange:C.white,fontSize,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>{item.name}</div>
+              <div style={{flex:1,height:18,background:"rgba(255,255,255,.06)",borderRadius:4,overflow:"hidden"}}>
                 <div style={{width:`${Math.max(pct,3)}%`,height:"100%",background:isFirst?C.brightOrange:BAR_COLORS[i]??"#1a1810",borderRadius:4}}/>
               </div>
-              <div style={{width:mob?40:50,textAlign:"right",color:isFirst?C.brightOrange:C.tan,fontSize,opacity:isFirst?1:.7,flexShrink:0}}>{pts}pt</div>
+              <div style={{width:50,textAlign:"right",color:isFirst?C.brightOrange:C.tan,fontSize,flexShrink:0}}>{pts}pt</div>
             </div>
           );
         })}
-        {inactive.length>0&&(
-          <div style={{marginTop:6,borderTop:"1px solid rgba(255,255,255,.08)",paddingTop:6,display:"flex",flexWrap:"wrap",gap:4}}>
-            {inactive.map(t=>(<div key={t.name} style={{color:C.tan,fontSize:mob?9:11,opacity:.3,padding:"2px 6px",border:"1px solid rgba(255,255,255,.08)",borderRadius:3}}>{t.name}</div>))}
-          </div>
-        )}
       </div>
-      <div style={{marginTop:mob?12:20,padding:"6px 18px",border:"1px solid rgba(254,137,9,.3)",borderRadius:4,color:C.orange,fontSize:mob?10:11,letterSpacing:2}}>KEEP PUSHING ⚔️</div>
+      {inactive.length>0&&(
+        <div style={{marginTop:12,display:"flex",flexWrap:"wrap",gap:4,justifyContent:"center"}}>
+          {inactive.map(t=>(<div key={t.name} style={{color:C.tan,fontSize:mob?9:11,opacity:.3,padding:"2px 6px",border:"1px solid rgba(255,255,255,.08)",borderRadius:3}}>{t.name}</div>))}
+        </div>
+      )}
+      <div style={{marginTop:16,padding:"6px 18px",border:"1px solid rgba(254,137,9,.3)",borderRadius:4,color:C.orange,fontSize:mob?10:11,letterSpacing:2}}>KEEP PUSHING ⚔️</div>
     </div>
   );
 }
