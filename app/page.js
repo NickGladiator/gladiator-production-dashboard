@@ -164,17 +164,17 @@ function OverallSlide({techs}){
   return(<div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:mob?"16px 20px":"20px 56px",boxSizing:"border-box",position:"relative",background:C.dark}}>
     <div style={{position:"absolute",top:0,left:0,right:0,height:5,background:`linear-gradient(90deg,${C.brightOrange},${C.orange})`}}/>
     <div style={{display:"flex",alignItems:"center",gap:mob?10:16,marginBottom:mob?8:16}}>
-      <div style={{fontSize:mob?36:48,transition:"transform .6s",transform:show?"scale(1)":"scale(0.4)"}}>🏆</div>
+      <div style={{fontSize:mob?36:48,transition:"transform .6s",transform:"scale(1)"}}>🏆</div>
       <div>
         <div style={{fontSize:mob?9:11,color:C.tan,letterSpacing:3,textTransform:"uppercase",opacity:.6}}>Overall Best Tech</div>
-        <div style={{fontFamily:"Georgia,serif",fontSize:mob?24:36,fontWeight:"bold",color:C.brightOrange,transition:"opacity .6s, transform .6s",opacity:show?1:0,transform:show?"translateY(0)":"translateY(16px)"}}>{winner?.name??"—"}</div>
+        <div style={{fontFamily:"Georgia,serif",fontSize:mob?24:36,fontWeight:"bold",color:C.brightOrange,transition:"opacity .6s, transform .6s",opacity:1,transform:"translateY(0)"}}>{winner?.name??"—"}</div>
         {winnerTopCats.length>0&&<div style={{fontSize:mob?10:12,color:C.tan,opacity:.7,marginTop:2}}>Led: <strong style={{color:C.brightOrange}}>{winnerTopCats.join(", ")}</strong></div>}
       </div>
     </div>
     <div style={{width:mob?"100%":"70%",display:"flex",flexDirection:"column",gap:rowGap}}>
       {active.map((item,i)=>{
         const isFirst=i===0,pts=item.pts??0,pct=maxPts>0?(pts/maxPts)*100:100;
-        return(<div key={item.name} style={{display:"flex",alignItems:"center",gap:mob?6:10,transition:`opacity .4s ${i*50}ms, transform .4s ${i*50}ms`,opacity:show?1:0,transform:show?"translateX(0)":"translateX(-20px)"}}>
+        return(<div key={item.name} style={{display:"flex",alignItems:"center",gap:mob?6:10,transition:`opacity .4s ${i*50}ms, transform .4s ${i*50}ms`,opacity:1,transform:"translateX(0)"}}>
           <div style={{width:mob?22:30,fontSize:i<3?(mob?13:16):fontSize,textAlign:"center",color:i<3?C.white:"rgba(255,255,255,.4)",flexShrink:0}}>{getMedal(i)}</div>
           <div style={{width:mob?100:140,color:isFirst?C.brightOrange:C.white,fontSize,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>{item.name}</div>
           <AnimatedBar pct={Math.max(pct,3)} color={isFirst?C.brightOrange:BAR_COLORS[i]??"#1a1810"} delay={i*50} height={mob?14:22}/>
