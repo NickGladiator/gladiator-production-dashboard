@@ -13,15 +13,10 @@ async function getSheetData(tabName) {
 
 function parseSheetDate(dateVal) {
   if (!dateVal) return null;
-  // DD/MM/YYYY format
   if (typeof dateVal === 'string' && dateVal.includes('/')) {
     const parts = dateVal.split('/');
-    const day   = parseInt(parts[0]);
-    const month = parseInt(parts[1]) - 1;
-    const year  = parseInt(parts[2]);
-    return new Date(year, month, day);
+    return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
   }
-  // Google Sheets Date(year,month,day) — month is already 0-indexed
   if (typeof dateVal === 'string' && dateVal.startsWith('Date(')) {
     const parts = dateVal.replace('Date(', '').replace(')', '').split(',');
     return new Date(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
@@ -41,7 +36,7 @@ function parseMoney(val) {
   return parseFloat(String(val).replace(/[$,]/g, '')) || 0;
 }
 
-const SKIP_NAMES = ['tech name', 'technician name', 'technician', 'name', 'lead tech on job'];
+const SKIP_NAMES = ['tech name', 'technician name', 'technician', 'name', 'lead tech on job', 'technician(s) on job', 'date of service'];
 
 function countByTech(rows, startDate, endDate) {
   const counts = {};
@@ -57,7 +52,6 @@ function countByTech(rows, startDate, endDate) {
 }
 
 function parseUpsells(rows, startDate, endDate) {
-  // A=Date, B=Technician, C=Description, D=Subtotal
   const counts = {}, dollars = {};
   for (const row of rows) {
     if (!row.c || !row.c[0] || !row.c[1]) continue;
@@ -73,25 +67,17 @@ function parseUpsells(rows, startDate, endDate) {
 }
 
 function parseCallbacks(rows, startDate, endDate) {
-  // A=Date of Job, B=Lead Tech, C=Other Techs, D=Customer,
-  // E=Date of Callback, F=Reason, G=Valid Callback, H=Revisit Booked, I=Customer Happy
   const counts = {};
   for (const row of rows) {
     if (!row.c || !row.c[0] || !row.c[1]) continue;
     const date = parseSheetDate(row.c[0].v);
     if (!date || date < startDate || date > endDate) continue;
-
-    // Only count valid callbacks (col G = "Yes")
     const valid = row.c[6]?.v?.toString().trim().toLowerCase();
     if (valid !== 'yes') continue;
-
-    // Lead tech (col B)
     const leadTech = row.c[1].v?.trim();
     if (leadTech && !SKIP_NAMES.includes(leadTech.toLowerCase())) {
       counts[leadTech] = (counts[leadTech] || 0) + 1;
     }
-
-    // Other techs (col C) — comma separated
     const otherTechs = row.c[2]?.v?.toString().trim();
     if (otherTechs) {
       otherTechs.split(',').forEach(t => {
@@ -103,6 +89,21 @@ function parseCallbacks(rows, startDate, endDate) {
     }
   }
   return counts;
+}
+
+function parseTips(rows, startDate, endDate) {
+  // A=Date, B=Tech Name, C=Customer, D=Total Tip, E=Amount to Technician
+  const totals = {};
+  for (const row of rows) {
+    if (!row.c || !row.c[0] || !row.c[1]) continue;
+    const tech = row.c[1].v?.trim();
+    if (!tech || SKIP_NAMES.includes(tech.toLowerCase())) continue;
+    const date = parseSheetDate(row.c[0].v);
+    if (!date || date < startDate || date > endDate) continue;
+    const amount = parseMoney(row.c[4]?.v ?? row.c[3]?.v);
+    totals[tech] = (totals[tech] || 0) + amount;
+  }
+  return totals;
 }
 
 function parseP4P(rows, startDate, endDate) {
@@ -143,12 +144,13 @@ export async function GET(request) {
     const endDate   = new Date(searchParams.get('endDate'));
     endDate.setHours(23, 59, 59, 999);
 
-    const [sickRows, yardRows, upsellRows, callbackRows, p4pRows] = await Promise.all([
+    const [sickRows, yardRows, upsellRows, callbackRows, p4pRows, tipRows] = await Promise.all([
       getSheetData('Sick Days'),
       getSheetData('Yard Signs'),
       getSheetData('Upsells'),
       getSheetData('Callbacks'),
       getSheetData('P4P'),
+      getSheetData('Customer Tips'),
     ]);
 
     const sickDays  = countByTech(sickRows,  startDate, endDate);
@@ -156,6 +158,7 @@ export async function GET(request) {
     const upsells   = parseUpsells(upsellRows, startDate, endDate);
     const callbacks = parseCallbacks(callbackRows, startDate, endDate);
     const p4p       = parseP4P(p4pRows, startDate, endDate);
+    const tips      = parseTips(tipRows, startDate, endDate);
 
     const allTechs = [...new Set([
       ...Object.keys(sickDays),
@@ -163,6 +166,7 @@ export async function GET(request) {
       ...Object.keys(upsells.counts),
       ...Object.keys(callbacks),
       ...Object.keys(p4p),
+      ...Object.keys(tips),
     ])];
 
     const hcpTechs = searchParams.get('techs') ? JSON.parse(searchParams.get('techs')) : null;
@@ -178,6 +182,7 @@ export async function GET(request) {
         hoursWorked:   p4p[tech]?.hoursWorked ?? 0,
         chargeRate:    p4p[tech]?.chargeRate  ?? 0,
         bonus:         p4p[tech]?.bonus       ?? 0,
+        tips:          tips[tech]             || 0,
       }));
 
     return NextResponse.json({ success: true, data: result });
