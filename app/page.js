@@ -149,7 +149,7 @@ function OverallSlide({techs}){
   const ranked=computeOverall(techs);
   const active=ranked.filter(t=>t.active),inactive=ranked.filter(t=>!t.active);
   const[show,setShow]=useState(false);
-  useEffect(()=>{setShow(false);const t=setTimeout(()=>setShow(true),150);return()=>clearTimeout(t);},[]);
+  useEffect(()=>{const t=setTimeout(()=>setShow(true),100);return()=>clearTimeout(t);},[]);
   const total=active.length,fontSize=mob?(total>8?10:12):(total>8?12:14),rowGap=mob?(total>8?5:7):(total>8?6:10);
   const maxPts=active[0]?.pts??1;
   const winner=active[0];
