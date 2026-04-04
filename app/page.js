@@ -57,7 +57,7 @@ function CategorySlide({category,techs}){
   const valWidth=mob?(category.key==="callbackRate"?85:70):120;
   const srcColor=SOURCE_COLORS[category.source]||C.tan;
   function fmt(v,t){
-    if(category.key==="tips")return`$${(v/100).toFixed(2)}`;
+    if(category.key==="tips")return`$${v.toFixed(2)}`;
     if(category.key==="chargeRate")return`$${v.toFixed(0)}/hr`;
     if(category.key==="callbackRate"){
       const jobs=t.jobsCompleted??0,cbs=t.callbacks??0;
@@ -167,7 +167,7 @@ function DashboardCard({category,techs}){
   const vals=ranked.map(t=>t[category.key]);
   const max=Math.max(...vals),min=Math.min(...vals),range=max-min||1;
   function fmt(v,t){
-    if(category.key==="tips")return`$${(v/100).toFixed(2)}`;
+    if(category.key==="tips")return`$${v.toFixed(2)}`;
     if(category.key==="chargeRate")return`$${v.toFixed(0)}/hr`;
     if(category.key==="callbackRate")return`${v}% (${t.jobsCompleted??0}/${t.callbacks??0})`;
     if(category.key==="upsellDollars")return`$${v.toFixed(2)}`;
