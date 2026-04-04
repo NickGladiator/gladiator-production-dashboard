@@ -151,30 +151,40 @@ function OverallSlide({techs}){
   const[show,setShow]=useState(false);
   useEffect(()=>{setShow(false);const t=setTimeout(()=>setShow(true),150);return()=>clearTimeout(t);},[]);
   const total=active.length,fontSize=mob?(total>8?10:12):(total>8?12:14),rowGap=mob?(total>8?5:7):(total>8?6:10);
+  const maxPts=active[0]?.pts??1;
+  const winner=active[0];
+  const winnerTopCats=winner?CATEGORIES.filter(cat=>{
+    const activeTechs=techs.filter(t=>t.jobsCompleted>0||t.hoursWorked>0);
+    const vals=activeTechs.map(t=>t[cat.key]);
+    const hasAny=vals.some(v=>v!==null&&v!==0&&v!==undefined);
+    if(!hasAny) return false;
+    const ranked2=getRankings(activeTechs,cat.key,cat.higherIsBetter);
+    return ranked2[0]?.name===winner.name;
+  }).map(cat=>cat.label):[];
   return(<div style={{height:"100%",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:mob?"16px 20px":"20px 56px",boxSizing:"border-box",position:"relative",background:C.dark}}>
     <div style={{position:"absolute",top:0,left:0,right:0,height:5,background:`linear-gradient(90deg,${C.brightOrange},${C.orange})`}}/>
-    <div style={{display:"flex",alignItems:"center",gap:mob?10:16,marginBottom:mob?12:20}}>
+    <div style={{display:"flex",alignItems:"center",gap:mob?10:16,marginBottom:mob?8:16}}>
       <div style={{fontSize:mob?36:48,transition:"transform .6s",transform:show?"scale(1)":"scale(0.4)"}}>🏆</div>
       <div>
         <div style={{fontSize:mob?9:11,color:C.tan,letterSpacing:3,textTransform:"uppercase",opacity:.6}}>Overall Best Tech</div>
-        <div style={{fontFamily:"Georgia,serif",fontSize:mob?24:36,fontWeight:"bold",color:C.brightOrange,transition:"opacity .6s, transform .6s",opacity:show?1:0,transform:show?"translateY(0)":"translateY(16px)"}}>{active[0]?.name??"—"}</div>
+        <div style={{fontFamily:"Georgia,serif",fontSize:mob?24:36,fontWeight:"bold",color:C.brightOrange,transition:"opacity .6s, transform .6s",opacity:show?1:0,transform:show?"translateY(0)":"translateY(16px)"}}>{winner?.name??"—"}</div>
+        {winnerTopCats.length>0&&<div style={{fontSize:mob?10:12,color:C.tan,opacity:.7,marginTop:2}}>Led: <strong style={{color:C.brightOrange}}>{winnerTopCats.join(", ")}</strong></div>}
       </div>
     </div>
     <div style={{width:mob?"100%":"70%",display:"flex",flexDirection:"column",gap:rowGap}}>
       {active.map((item,i)=>{
-        const isFirst=i===0,pct=active[0].pts>0?(item.pts/active[0].pts)*100:100;
+        const isFirst=i===0,pts=item.pts??0,pct=maxPts>0?(pts/maxPts)*100:100;
         return(<div key={item.name} style={{display:"flex",alignItems:"center",gap:mob?6:10,transition:`opacity .4s ${i*50}ms, transform .4s ${i*50}ms`,opacity:show?1:0,transform:show?"translateX(0)":"translateX(-20px)"}}>
           <div style={{width:mob?22:30,fontSize:i<3?(mob?13:16):fontSize,textAlign:"center",color:i<3?C.white:"rgba(255,255,255,.4)",flexShrink:0}}>{getMedal(i)}</div>
           <div style={{width:mob?100:140,color:isFirst?C.brightOrange:C.white,fontSize,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>{item.name}</div>
           <AnimatedBar pct={Math.max(pct,3)} color={isFirst?C.brightOrange:BAR_COLORS[i]??"#1a1810"} delay={i*50} height={mob?14:22}/>
-          <div style={{width:mob?40:50,textAlign:"right",color:isFirst?C.brightOrange:C.tan,fontSize,opacity:isFirst?1:.7,flexShrink:0}}>{item.pts}pt</div>
+          <div style={{width:mob?40:50,textAlign:"right",color:isFirst?C.brightOrange:C.tan,fontSize,opacity:isFirst?1:.7,flexShrink:0}}>{pts}pt</div>
         </div>);
       })}
       {inactive.length>0&&(<div style={{marginTop:6,borderTop:"1px solid rgba(255,255,255,.08)",paddingTop:6,display:"flex",flexWrap:"wrap",gap:4}}>
         {inactive.map(t=>(<div key={t.name} style={{color:C.tan,fontSize:mob?9:11,opacity:.3,padding:"2px 6px",border:"1px solid rgba(255,255,255,.08)",borderRadius:3}}>{t.name}</div>))}
       </div>)}
     </div>
-    <WinnerBreakdown winner={active[0]} techs={active} mob={mob}/>
     <div style={{marginTop:mob?12:20,padding:"6px 18px",border:"1px solid rgba(254,137,9,.3)",borderRadius:4,color:C.orange,fontSize:mob?10:11,letterSpacing:2}}>KEEP PUSHING ⚔️</div>
   </div>);
 }
