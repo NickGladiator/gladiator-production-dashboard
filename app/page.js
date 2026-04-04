@@ -162,7 +162,7 @@ function OverallSlide({techs}){
     </div>
     <div style={{width:mob?"100%":"70%",display:"flex",flexDirection:"column",gap:rowGap}}>
       {active.map((item,i)=>{
-        const isFirst=i===0,pct=(item.pts/active[0].pts)*100;
+        const isFirst=i===0,pct=active[0].pts>0?(item.pts/active[0].pts)*100:100;
         return(<div key={item.name} style={{display:"flex",alignItems:"center",gap:mob?6:10,transition:`opacity .4s ${i*50}ms, transform .4s ${i*50}ms`,opacity:show?1:0,transform:show?"translateX(0)":"translateX(-20px)"}}>
           <div style={{width:mob?22:30,fontSize:i<3?(mob?13:16):fontSize,textAlign:"center",color:i<3?C.white:"rgba(255,255,255,.4)",flexShrink:0}}>{getMedal(i)}</div>
           <div style={{width:mob?100:140,color:isFirst?C.brightOrange:C.white,fontSize,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>{item.name}</div>
