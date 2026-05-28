@@ -38,6 +38,18 @@ function parseMoney(val) {
 
 const SKIP_NAMES = ['tech name', 'technician name', 'technician', 'name', 'lead tech on job', 'technician(s) on job', 'date of service'];
 
+// Read hourly pay rates from All techs sheet (col A=name, B=slack, C=status, D=pay)
+async function getHourlyRates() {
+  const rows = await getSheetData('All techs');
+  const rates = {};
+  for (const row of rows) {
+    const name = row.c?.[0]?.v?.trim();
+    const pay = parseMoney(row.c?.[3]?.v);
+    if (name && pay > 0) rates[name] = pay;
+  }
+  return rates;
+}
+
 function countByTech(rows, startDate, endDate) {
   const counts = {};
   for (const row of rows) {
@@ -92,7 +104,6 @@ function parseCallbacks(rows, startDate, endDate) {
 }
 
 function parseTips(rows, startDate, endDate) {
-  // A=Date, B=Tech Name, C=Customer, D=Total Tip, E=Amount to Technician
   const totals = {};
   for (const row of rows) {
     if (!row.c || !row.c[0] || !row.c[1]) continue;
@@ -106,8 +117,11 @@ function parseTips(rows, startDate, endDate) {
   return totals;
 }
 
-function parseP4P(rows, startDate, endDate) {
+function parseP4P(rows, startDate, endDate, hourlyRates) {
+  // Group hours by tech AND week period to calculate overtime per week
   const stats = {};
+  const weeklyHours = {}; // { "Name||weekPeriod": hours }
+
   for (const row of rows) {
     if (!row.c || !row.c[0]) continue;
     const firstName = row.c[0]?.v?.trim();
@@ -116,22 +130,48 @@ function parseP4P(rows, startDate, endDate) {
     const dateStr = row.c[2]?.f || row.c[2]?.v;
     const date = dateStr ? new Date(dateStr) : null;
     if (!date || isNaN(date) || date < startDate || date > endDate) continue;
+
     const name = `${firstName} ${lastName}`;
+    const weekPeriod = row.c[3]?.v?.trim() || 'unknown';
+    const weekKey = `${name}||${weekPeriod}`;
+
     if (!stats[name]) stats[name] = { totalHours: 0, totalPay: 0, bonus: 0 };
+    if (!weeklyHours[weekKey]) weeklyHours[weekKey] = 0;
+
     const shiftHours  = parseShiftLength(String(row.c[9]?.v || ''));
+    const breakHours  = parseShiftLength(String(row.c[10]?.v || ''));
+    const netHours    = shiftHours - breakHours;
     const basePay     = parseMoney(row.c[6]?.v);
     const crewP4P     = parseMoney(row.c[7]?.v);
     const perfDollars = parseMoney(row.c[8]?.v);
-    stats[name].totalHours += shiftHours;
+
+    stats[name].totalHours += netHours;
     stats[name].totalPay   += Math.max(basePay, crewP4P);
     stats[name].bonus      += perfDollars;
+    weeklyHours[weekKey]   += netHours;
   }
+
+  // Calculate overtime deduction per tech
+  const overtimeDeductions = {};
+  for (const [weekKey, hours] of Object.entries(weeklyHours)) {
+    const name = weekKey.split('||')[0];
+    const overtimeHours = Math.max(0, hours - 44);
+    if (overtimeHours > 0) {
+      const hourlyRate = hourlyRates[name] ?? 0;
+      const overtimePremium = overtimeHours * (hourlyRate * 0.5);
+      overtimeDeductions[name] = (overtimeDeductions[name] || 0) + overtimePremium;
+    }
+  }
+
   const result = {};
   for (const [name, s] of Object.entries(stats)) {
+    const deduction = overtimeDeductions[name] || 0;
+    const adjustedBonus = Math.max(0, s.bonus - deduction);
     result[name] = {
-      hoursWorked: s.totalHours,
-      chargeRate:  s.totalHours > 0 ? Math.round(s.totalPay / s.totalHours) : 0,
-      bonus:       s.bonus,
+      hoursWorked:       s.totalHours,
+      chargeRate:        s.totalHours > 0 ? Math.round(s.totalPay / s.totalHours) : 0,
+      bonus:             adjustedBonus,
+      overtimeDeduction: deduction,
     };
   }
   return result;
@@ -144,20 +184,21 @@ export async function GET(request) {
     const endDate   = new Date(searchParams.get('endDate'));
     endDate.setHours(23, 59, 59, 999);
 
-    const [sickRows, yardRows, upsellRows, callbackRows, p4pRows, tipRows] = await Promise.all([
+    const [sickRows, yardRows, upsellRows, callbackRows, p4pRows, tipRows, hourlyRates] = await Promise.all([
       getSheetData('Sick Days'),
       getSheetData('Yard Signs'),
       getSheetData('Upsells'),
       getSheetData('Callbacks'),
       getSheetData('P4P'),
       getSheetData('Customer Tips'),
+      getHourlyRates(),
     ]);
 
     const sickDays  = countByTech(sickRows,  startDate, endDate);
     const yardSigns = countByTech(yardRows,  startDate, endDate);
     const upsells   = parseUpsells(upsellRows, startDate, endDate);
     const callbacks = parseCallbacks(callbackRows, startDate, endDate);
-    const p4p       = parseP4P(p4pRows, startDate, endDate);
+    const p4p       = parseP4P(p4pRows, startDate, endDate, hourlyRates);
     const tips      = parseTips(tipRows, startDate, endDate);
 
     const allTechs = [...new Set([
@@ -174,15 +215,16 @@ export async function GET(request) {
       .filter(tech => !hcpTechs || hcpTechs.includes(tech))
       .map(tech => ({
         tech,
-        sickDays:      sickDays[tech]         || 0,
-        yardSigns:     yardSigns[tech]        || 0,
-        upsellCount:   upsells.counts[tech]   || 0,
-        upsellDollars: upsells.dollars[tech]  || 0,
-        callbacks:     callbacks[tech]        || 0,
-        hoursWorked:   p4p[tech]?.hoursWorked ?? 0,
-        chargeRate:    p4p[tech]?.chargeRate  ?? 0,
-        bonus:         p4p[tech]?.bonus       ?? 0,
-        tips:          tips[tech]             || 0,
+        sickDays:          sickDays[tech]              || 0,
+        yardSigns:         yardSigns[tech]             || 0,
+        upsellCount:       upsells.counts[tech]        || 0,
+        upsellDollars:     upsells.dollars[tech]       || 0,
+        callbacks:         callbacks[tech]             || 0,
+        hoursWorked:       p4p[tech]?.hoursWorked      ?? 0,
+        chargeRate:        p4p[tech]?.chargeRate       ?? 0,
+        bonus:             p4p[tech]?.bonus            ?? 0,
+        overtimeDeduction: p4p[tech]?.overtimeDeduction ?? 0,
+        tips:              tips[tech]                  || 0,
       }));
 
     return NextResponse.json({ success: true, data: result });
