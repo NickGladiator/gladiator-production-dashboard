@@ -127,23 +127,6 @@ function BonusSlide({techs}){
   </div>);
 }
 
-function WinnerBreakdown({winner, techs, mob}){
-  if(!winner) return null;
-  const topCats=CATEGORIES.filter(cat=>{
-    const vals=techs.map(t=>t[cat.key]);
-    const hasAny=vals.some(v=>v!==null&&v!==0&&v!==undefined);
-    if(!hasAny) return false;
-    const ranked=getRankings(techs,cat.key,cat.higherIsBetter);
-    return ranked[0]?.name===winner.name;
-  }).map(cat=>cat.label);
-  if(topCats.length===0) return null;
-  return(
-    <div style={{marginTop:mob?8:12,padding:"8px 16px",background:"rgba(254,137,9,.08)",border:"1px solid rgba(254,137,9,.2)",borderRadius:6,color:C.tan,fontSize:mob?10:12,textAlign:"center",maxWidth:mob?"100%":"60%"}}>
-      🏆 Won by leading in: <strong style={{color:C.brightOrange}}>{topCats.join(", ")}</strong>
-    </div>
-  );
-}
-
 function OverallSlide({techs}){
   const mob=useIsMobile();
   const ranked=computeOverall(techs);
@@ -216,30 +199,12 @@ function DashboardCard({category,techs}){
       const rate=totalJobs>0?Math.round((totalCbs/totalJobs)*100):0;
       return`${rate}% (${totalJobs} jobs / ${totalCbs} callbacks)`;
     }
-    if(category.key==="tips"){
-      const total=techs.reduce((s,t)=>s+(t.tips??0),0);
-      return`$${total.toFixed(2)}`;
-    }
-    if(category.key==="upsellDollars"){
-      const total=techs.reduce((s,t)=>s+(t.upsellDollars??0),0);
-      return`$${total.toFixed(2)}`;
-    }
-    if(category.key==="p4pBonus"){
-      const total=techs.reduce((s,t)=>s+(t.p4pBonus??0),0);
-      return`$${total.toFixed(2)}`;
-    }
-    if(category.key==="yardSigns"){
-      const total=techs.reduce((s,t)=>s+(t.yardSigns??0),0);
-      return`${total} signs`;
-    }
-    if(category.key==="sickDays"){
-      const total=techs.reduce((s,t)=>s+(t.sickDays??0),0);
-      return`${total} days`;
-    }
-    if(category.key==="reviews"){
-      const total=techs.reduce((s,t)=>s+(t.reviews??0),0);
-      return`${total} reviews`;
-    }
+    if(category.key==="tips")return`$${techs.reduce((s,t)=>s+(t.tips??0),0).toFixed(2)}`;
+    if(category.key==="upsellDollars")return`$${techs.reduce((s,t)=>s+(t.upsellDollars??0),0).toFixed(2)}`;
+    if(category.key==="p4pBonus")return`$${techs.reduce((s,t)=>s+(t.p4pBonus??0),0).toFixed(2)}`;
+    if(category.key==="yardSigns")return`${techs.reduce((s,t)=>s+(t.yardSigns??0),0)} signs`;
+    if(category.key==="sickDays")return`${techs.reduce((s,t)=>s+(t.sickDays??0),0)} days`;
+    if(category.key==="reviews")return`${techs.reduce((s,t)=>s+(t.reviews??0),0)} reviews`;
     return null;
   }
   const total=companyTotal();
@@ -274,6 +239,15 @@ function Dashboard({data,onBack}){
   const overall=computeOverall(techs);
   const active=overall.filter(t=>t.active);
   const scoreMap=Object.fromEntries(overall.map(t=>[t.name,t.pts??0]));
+  const legend=[
+    {icon:"📞",label:"Callback Rate",weight:"3x",desc:"↓ lower",color:"#ff6b6b"},
+    {icon:"💵",label:"P4P Bonus",weight:"2x",desc:"↑ higher",color:"#FE8909"},
+    {icon:"⭐",label:"Reviews",weight:"2x",desc:"↑ higher",color:"#FE8909"},
+    {icon:"📈",label:"Upsells",weight:"1.5x",desc:"↑ higher",color:"#FE8909"},
+    {icon:"💰",label:"Tips",weight:"1x",desc:"↑ higher",color:"#8F774D"},
+    {icon:"🪧",label:"Yard Signs",weight:"1x",desc:"↑ higher",color:"#8F774D"},
+    {icon:"🤒",label:"Sick Days",weight:"1x",desc:"↓ lower",color:"#ff6b6b"},
+  ];
   return(<div style={{minHeight:"100vh",background:C.darker,fontFamily:"system-ui,sans-serif"}}>
     <div style={{background:C.dark,borderBottom:"1px solid rgba(255,255,255,.08)",padding:mob?"10px 16px":"12px 24px",display:"flex",alignItems:"center",gap:12}}>
       <span style={{fontSize:mob?20:24}}>⚔️</span>
@@ -291,13 +265,25 @@ function Dashboard({data,onBack}){
             const ranked=getRankings(active,cat.key,cat.higherIsBetter);
             const hasAny=ranked.some(t=>t[cat.key]!==null&&t[cat.key]!==0&&t[cat.key]!==undefined);
             if(!hasAny)return false;
-            const pos=ranked.findIndex(t=>t.name===winner.name);
-            return pos===0;
+            return ranked.findIndex(t=>t.name===winner.name)===0;
           }).map(cat=>cat.label);
           return topCats.length>0&&<div style={{color:C.tan,fontSize:10,opacity:.6}}>Led: {topCats.join(", ")}</div>;
         })()}
       </div>)}
       <button onClick={onBack} style={{padding:mob?"5px 10px":"6px 14px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",borderRadius:4,color:C.tan,fontSize:mob?11:12,cursor:"pointer"}}>← Back</button>
+    </div>
+    <div style={{background:"rgba(255,255,255,.03)",borderBottom:"1px solid rgba(255,255,255,.06)",padding:mob?"6px 12px":"6px 24px",overflowX:"auto"}}>
+      <div style={{display:"flex",gap:mob?6:10,alignItems:"center",minWidth:"max-content"}}>
+        <div style={{color:C.tan,fontSize:mob?9:10,opacity:.5,letterSpacing:2,whiteSpace:"nowrap"}}>SCORING:</div>
+        {legend.map(item=>(
+          <div key={item.label} style={{display:"flex",alignItems:"center",gap:4,padding:mob?"3px 7px":"3px 9px",background:"rgba(255,255,255,.04)",borderRadius:20,border:"1px solid rgba(255,255,255,.08)",whiteSpace:"nowrap"}}>
+            <span style={{fontSize:mob?11:12}}>{item.icon}</span>
+            <span style={{color:C.white,fontSize:mob?9:10,opacity:.8}}>{item.label}</span>
+            <span style={{color:item.color,fontSize:mob?9:10,fontWeight:"bold"}}>{item.weight}</span>
+            <span style={{color:C.tan,fontSize:mob?8:9,opacity:.5}}>{item.desc}</span>
+          </div>
+        ))}
+      </div>
     </div>
     <div style={{padding:mob?12:24,display:"grid",gridTemplateColumns:mob?"1fr":"repeat(auto-fill, minmax(340px, 1fr))",gap:mob?10:16}}>
       <div style={{background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.08)",borderRadius:8,padding:"14px 16px",gridColumn:mob?"1":"1/-1"}}>
@@ -406,8 +392,6 @@ function Slideshow({data,onBack}){
   const[dir,setDir]=useState(1);
   const go=useCallback((n)=>{if(n<0||n>=total)return;setDir(n>slide?1:-1);setSlide(n);setAnimKey(k=>k+1);},[slide,total]);
   useEffect(()=>{const h=e=>{if(e.key==="ArrowRight"||e.key==="ArrowDown")go(slide+1);if(e.key==="ArrowLeft"||e.key==="ArrowUp")go(slide-1);};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[go,slide]);
-
-  // Swipe support for mobile
   const[touchX,setTouchX]=useState(null);
   const onTouchStart=e=>setTouchX(e.touches[0].clientX);
   const onTouchEnd=e=>{
@@ -416,11 +400,11 @@ function Slideshow({data,onBack}){
     if(Math.abs(dx)>40){dx<0?go(slide+1):go(slide-1);}
     setTouchX(null);
   };
-
-  const slideNames=["Intro",...CATEGORIES.map(c=>c.label),"Overall"];
+  const slideNames=["Intro",...CATEGORIES.map(c=>c.label),"P4P Bonus","Overall"];
   const slides=[
     <TitleSlide key="title" dateRange={dateRange}/>,
     ...CATEGORIES.map(cat=><CategorySlide key={cat.key} category={cat} techs={techs}/>),
+    <BonusSlide key="bonus" techs={techs}/>,
     <OverallSlide key="overall" techs={techs}/>,
   ];
   return(<div style={{height:"100vh",background:C.darker,display:"flex",flexDirection:"column",fontFamily:"system-ui,sans-serif"}}>
