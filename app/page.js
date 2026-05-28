@@ -374,6 +374,7 @@ function SetupScreen({onGenerate}){
           {modeBtn("dashboard","📊","Dashboard","All categories at once")}
         </div>
       </div>
+      <div style={{padding:"8px 12px",background:"rgba(254,137,9,.06)",borderRadius:5,border:"1px solid rgba(254,137,9,.2)",color:C.tan,fontSize:mob?11:12,textAlign:"center"}}>⚠️ P4P bonuses may be affected by overtime hours accumulated in the pay period</div>
       {error&&<div style={{color:"#ff6b6b",fontSize:13,padding:"10px 14px",background:"rgba(255,107,107,.1)",borderRadius:5,border:"1px solid rgba(255,107,107,.2)"}}>⚠️ {error}</div>}
       {status&&<div style={{color:C.tan,fontSize:13,textAlign:"center",opacity:.7}}>⏳ {status}</div>}
       <button onClick={generate} disabled={!!status} style={{padding:"16px 0",background:status?"rgba(254,137,9,.3)":`linear-gradient(135deg,${C.orange},${C.brightOrange})`,border:"none",borderRadius:6,color:C.white,fontSize:mob?15:17,fontWeight:"bold",cursor:status?"not-allowed":"pointer",letterSpacing:2,boxShadow:status?"none":"0 4px 20px rgba(254,137,9,.3)"}}>
