@@ -214,6 +214,7 @@ function DashboardCard({category,techs}){
       <span style={{color:C.brightOrange,fontWeight:"bold",fontSize:12,letterSpacing:1,textTransform:"uppercase"}}>{category.label}</span>
       {total&&<span style={{marginLeft:"auto",color:C.tan,fontSize:11,opacity:.7}}>Total: <strong style={{color:C.white}}>{total}</strong></span>}
     </div>
+    {category.key==="p4pBonus"&&<div style={{marginBottom:8,padding:"5px 10px",background:"rgba(254,137,9,.06)",borderRadius:5,border:"1px solid rgba(254,137,9,.2)",color:C.tan,fontSize:10,textAlign:"center"}}>⚠️ Bonuses may be affected by overtime hours</div>}
     {noData?(<div style={{color:C.tan,fontSize:11,opacity:.4,textAlign:"center",padding:"10px 0"}}>No data</div>):(
       <div style={{display:"flex",flexDirection:"column",gap:6}}>
         {ranked.map((t)=>{
