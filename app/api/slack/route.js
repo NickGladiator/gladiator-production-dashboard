@@ -2,18 +2,29 @@ import { NextResponse } from 'next/server';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const CHANNEL_ID = process.env.SLACK_YARD_SIGNS_CHANNEL_ID;
+const SHEET_ID = process.env.GOOGLE_SHEETS_ID;
 
-function getTechMap() {
-  try {
-    return JSON.parse(process.env.TECH_SLACK_MAP || '{}');
-  } catch {
-    return {};
+async function getTechMapFromSheets() {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=All%20techs`;
+  const res = await fetch(url);
+  const text = await res.text();
+  const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);/)[1]);
+  
+  const map = {};
+  for (const row of json.table.rows) {
+    const techName = row.c?.[0]?.v?.trim();
+    const slackNick = row.c?.[1]?.v?.trim();
+    const status = row.c?.[2]?.v?.trim();
+    if (techName && slackNick && status === 'Active') {
+      map[techName] = slackNick;
+    }
   }
+  return map;
 }
 
 export async function GET(request) {
   try {
-    const TECH_SLACK_MAP = getTechMap();
+    const TECH_SLACK_MAP = await getTechMapFromSheets();
     const SLACK_TO_TECH = Object.fromEntries(
       Object.entries(TECH_SLACK_MAP).map(([hcp, slack]) => [slack.toLowerCase(), hcp])
     );
