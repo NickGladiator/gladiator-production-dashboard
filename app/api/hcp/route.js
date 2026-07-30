@@ -65,7 +65,7 @@ export async function GET(request) {
       if (!assigned.length) continue;
 
       const n        = assigned.length;
-      const isPaid   = (job.total_amount || 0) > 0;
+      const isCompleted = job.work_status === 'completed';
       const hasReview = (job.tags || []).some(
         t => typeof t === 'string' && t.toLowerCase() === '5 star google review'
       );
@@ -74,10 +74,11 @@ export async function GET(request) {
         const name = `${emp.first_name} ${emp.last_name}`.trim();
         if (!stats[name]) continue;
 
-        // Only count paid jobs toward completed jobs and revenue
-        if (isPaid) {
+        // Count toward completed jobs, revenue, and tips once the job is marked completed
+        // (regardless of whether it's been invoiced/paid yet)
+        if (isCompleted) {
           stats[name].jobsCompleted += 1;
-          stats[name].revenue       += job.total_amount / n;
+          stats[name].revenue       += (job.total_amount || 0) / n;
           stats[name].tips          += (job.tip_amount || 0) / n;
         }
 
