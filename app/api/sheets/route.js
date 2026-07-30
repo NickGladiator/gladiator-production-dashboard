@@ -50,6 +50,18 @@ async function getHourlyRates() {
   return rates;
 }
 
+// Read the full active tech roster from All techs sheet (col A=name, C=status)
+async function getActiveTechRoster() {
+  const rows = await getSheetData('All techs');
+  const names = [];
+  for (const row of rows) {
+    const name = row.c?.[0]?.v?.trim();
+    const status = row.c?.[2]?.v?.trim();
+    if (name && status === 'Active') names.push(name);
+  }
+  return names;
+}
+
 function countByTech(rows, startDate, endDate) {
   const counts = {};
   for (const row of rows) {
@@ -184,7 +196,7 @@ export async function GET(request) {
     const endDate   = new Date(searchParams.get('endDate'));
     endDate.setHours(23, 59, 59, 999);
 
-    const [sickRows, yardRows, upsellRows, callbackRows, p4pRows, tipRows, hourlyRates] = await Promise.all([
+    const [sickRows, yardRows, upsellRows, callbackRows, p4pRows, tipRows, hourlyRates, activeRoster] = await Promise.all([
       getSheetData('Sick Days'),
       getSheetData('Yard Signs'),
       getSheetData('Upsells'),
@@ -192,6 +204,7 @@ export async function GET(request) {
       getSheetData('P4P'),
       getSheetData('Customer Tips'),
       getHourlyRates(),
+      getActiveTechRoster(),
     ]);
 
     const sickDays  = countByTech(sickRows,  startDate, endDate);
@@ -202,6 +215,7 @@ export async function GET(request) {
     const tips      = parseTips(tipRows, startDate, endDate);
 
     const allTechs = [...new Set([
+      ...activeRoster,
       ...Object.keys(sickDays),
       ...Object.keys(yardSigns),
       ...Object.keys(upsells.counts),
