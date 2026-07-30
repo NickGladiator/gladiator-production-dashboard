@@ -324,10 +324,9 @@ function SetupScreen({onGenerate}){
       const hcpRes=await fetch(`/api/hcp?startDate=${start}&endDate=${end}`);
       const hcpData=await hcpRes.json();
       if(hcpData.error)throw new Error("HCP: "+hcpData.error);
-      const techNames=encodeURIComponent(JSON.stringify(hcpData.data.map(t=>t.tech)));
       setStatus("Loading Sheets & Slack...");
       const[sheetsRes,slackRes]=await Promise.all([
-        fetch(`/api/sheets?startDate=${start}&endDate=${end}&techs=${techNames}`),
+        fetch(`/api/sheets?startDate=${start}&endDate=${end}`),
         fetch(`/api/slack?startDate=${start}&endDate=${end}`),
       ]);
       setStatus("Processing data...");
