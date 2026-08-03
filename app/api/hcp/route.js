@@ -44,6 +44,7 @@ export async function GET(request) {
     const jobs = await fetchAllPages(
       `/jobs?scheduled_start_min=${startISO}&scheduled_start_max=${endISO}`
     );
+    const debugStatuses = [...new Set(jobs.map(j => j.work_status))];
 
     // Build per-tech stats
     const stats = {};
@@ -95,7 +96,7 @@ export async function GET(request) {
       s.chargeRate = s.hoursWorked > 0 ? Math.round(s.revenue / s.hoursWorked) : 0;
     }
 
-    return NextResponse.json({ success: true, data: Object.values(stats) });
+    return NextResponse.json({ success: true, data: Object.values(stats), debugStatuses });
   } catch (err) {
     console.error('HCP API error:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
