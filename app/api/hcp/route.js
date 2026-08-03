@@ -39,6 +39,7 @@ export async function GET(request) {
       e.role === 'field tech' &&
       !exclude.includes(`${e.first_name} ${e.last_name}`.trim())
     );
+    const debugEmployees = employees.map(e => ({ name: `${e.first_name} ${e.last_name}`.trim(), role: e.role }));
 
     // Fetch all jobs in date range
     const jobs = await fetchAllPages(
@@ -89,7 +90,7 @@ export async function GET(request) {
       s.chargeRate = s.hoursWorked > 0 ? Math.round(s.revenue / s.hoursWorked) : 0;
     }
 
-    return NextResponse.json({ success: true, data: Object.values(stats) });
+    return NextResponse.json({ success: true, data: Object.values(stats), debugEmployees });
   } catch (err) {
     console.error('HCP API error:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
