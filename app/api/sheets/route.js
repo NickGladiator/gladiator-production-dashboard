@@ -36,7 +36,7 @@ function parseMoney(val) {
   return parseFloat(String(val).replace(/[$,]/g, '')) || 0;
 }
 
-const SKIP_NAMES = ['tech name', 'technician name', 'technician', 'name', 'lead tech on job', 'technician(s) on job', 'date of service'];
+const SKIP_NAMES = ['tech name', 'technician name', 'technician', 'name', 'lead tech on job', 'technician(s) on job', 'technician on job', 'date of service', 'no one'];
 
 // Read hourly pay rates from All techs sheet (col A=name, B=slack, C=status, D=pay)
 async function getHourlyRates() {
@@ -129,6 +129,22 @@ function parseTips(rows, startDate, endDate) {
   return totals;
 }
 
+function parseReviews(rows, startDate, endDate) {
+  const counts = {};
+  for (const row of rows) {
+    if (!row.c || !row.c[0]) continue;
+    const date = parseSheetDate(row.c[0].v);
+    if (!date || isNaN(date) || date < startDate || date > endDate) continue;
+    [row.c[1]?.v, row.c[2]?.v].forEach(val => {
+      const name = val?.toString().trim();
+      if (name && !SKIP_NAMES.includes(name.toLowerCase())) {
+        counts[name] = (counts[name] || 0) + 1;
+      }
+    });
+  }
+  return counts;
+}
+
 function parseP4P(rows, startDate, endDate, hourlyRates) {
   // Group hours by tech AND week period to calculate overtime per week
   const stats = {};
@@ -196,13 +212,14 @@ export async function GET(request) {
     const endDate   = new Date(searchParams.get('endDate'));
     endDate.setHours(23, 59, 59, 999);
 
-    const [sickRows, yardRows, upsellRows, callbackRows, p4pRows, tipRows, hourlyRates, activeRoster] = await Promise.all([
+    const [sickRows, yardRows, upsellRows, callbackRows, p4pRows, tipRows, reviewRows, hourlyRates, activeRoster] = await Promise.all([
       getSheetData('Sick Days'),
       getSheetData('Yard Signs'),
       getSheetData('Upsells'),
       getSheetData('Callbacks'),
       getSheetData('P4P'),
       getSheetData('Customer Tips'),
+      getSheetData('Customer Reviews'),
       getHourlyRates(),
       getActiveTechRoster(),
     ]);
@@ -213,6 +230,7 @@ export async function GET(request) {
     const callbacks = parseCallbacks(callbackRows, startDate, endDate);
     const p4p       = parseP4P(p4pRows, startDate, endDate, hourlyRates);
     const tips      = parseTips(tipRows, startDate, endDate);
+    const reviews   = parseReviews(reviewRows, startDate, endDate);
 
     const allTechs = [...new Set([
       ...activeRoster,
@@ -222,6 +240,7 @@ export async function GET(request) {
       ...Object.keys(callbacks),
       ...Object.keys(p4p),
       ...Object.keys(tips),
+      ...Object.keys(reviews),
     ])];
 
     const hcpTechs = searchParams.get('techs') ? JSON.parse(searchParams.get('techs')) : null;
@@ -239,6 +258,7 @@ export async function GET(request) {
         bonus:             p4p[tech]?.bonus            ?? 0,
         overtimeDeduction: p4p[tech]?.overtimeDeduction ?? 0,
         tips:              tips[tech]                  || 0,
+        reviews:           reviews[tech]               || 0,
       }));
 
     return NextResponse.json({ success: true, data: result });
