@@ -35,11 +35,13 @@ export async function GET(request) {
     if (!empRes.ok) throw new Error(`HCP error: ${empRes.status} /employees`);
     const employees = (await empRes.json()).employees || [];
     const exclude   = ['Nick Preisenhammer'];
-    const techs     = employees.filter(e =>
-      e.role === 'field tech' &&
-      !exclude.includes(`${e.first_name} ${e.last_name}`.trim())
-    );
-    const debugEmployees = employees.map(e => ({ name: `${e.first_name} ${e.last_name}`.trim(), role: e.role }));
+    // These techs are misclassified as "office staff" in Housecall Pro but are actually field techs
+    const includeOverride = ['Keith Mayne', 'Kirin Cremasco'];
+    const techs = employees.filter(e => {
+      const name = `${e.first_name} ${e.last_name}`.trim();
+      if (exclude.includes(name)) return false;
+      return e.role === 'field tech' || includeOverride.includes(name);
+    });
 
     // Fetch all jobs in date range
     const jobs = await fetchAllPages(
@@ -90,7 +92,7 @@ export async function GET(request) {
       s.chargeRate = s.hoursWorked > 0 ? Math.round(s.revenue / s.hoursWorked) : 0;
     }
 
-    return NextResponse.json({ success: true, data: Object.values(stats), debugEmployees });
+    return NextResponse.json({ success: true, data: Object.values(stats) });
   } catch (err) {
     console.error('HCP API error:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
