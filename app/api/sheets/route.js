@@ -52,6 +52,9 @@ function parseMoney(val) {
 
 const SKIP_NAMES = ['tech name', 'technician name', 'technician', 'name', 'lead tech on job', 'technician(s) on job', 'technician on job', 'date of service', 'no one'];
 
+// Management/office staff who show up in tracking sheets but shouldn't be scored
+const EXCLUDE_TECHS = ['Kirin Cremasco'];
+
 // Read hourly pay rates from All techs sheet (col A=name, B=slack, C=status, D=pay)
 async function getHourlyRates() {
   const rows = await getSheetData('All techs');
@@ -260,6 +263,7 @@ export async function GET(request) {
     const hcpTechs = searchParams.get('techs') ? JSON.parse(searchParams.get('techs')) : null;
     const result = allTechs
       .filter(tech => !hcpTechs || hcpTechs.includes(tech))
+      .filter(tech => !EXCLUDE_TECHS.includes(tech))
       .map(tech => ({
         tech,
         sickDays:          sickDays[tech]              || 0,
