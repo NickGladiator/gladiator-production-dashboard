@@ -36,7 +36,7 @@ export async function GET(request) {
     const employees = (await empRes.json()).employees || [];
     const exclude   = ['Nick Preisenhammer'];
     // These techs are misclassified as "office staff" in Housecall Pro but are actually field techs
-    const includeOverride = ['Keith Mayne', 'Kirin Cremasco'];
+    const includeOverride = ['Keith Mayne'];
     const techs = employees.filter(e => {
       const name = `${e.first_name} ${e.last_name}`.trim();
       if (exclude.includes(name)) return false;
