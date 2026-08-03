@@ -44,7 +44,6 @@ export async function GET(request) {
     const jobs = await fetchAllPages(
       `/jobs?scheduled_start_min=${startISO}&scheduled_start_max=${endISO}`
     );
-    const debugStatuses = [...new Set(jobs.map(j => j.work_status))];
 
     // Build per-tech stats
     const stats = {};
@@ -55,7 +54,6 @@ export async function GET(request) {
         jobsCompleted: 0,
         revenue:       0,
         tips:          0,
-        reviews:       0,
         hoursWorked:   0,
         chargeRate:    0,
       };
@@ -65,11 +63,8 @@ export async function GET(request) {
       const assigned = job.assigned_employees || [];
       if (!assigned.length) continue;
 
-      const n        = assigned.length;
+      const n = assigned.length;
       const isCompleted = job.work_status === 'complete rated' || job.work_status === 'complete unrated';
-      const hasReview = (job.tags || []).some(
-        t => typeof t === 'string' && t.toLowerCase() === '5 star google review'
-      );
 
       for (const emp of assigned) {
         const name = `${emp.first_name} ${emp.last_name}`.trim();
@@ -86,8 +81,6 @@ export async function GET(request) {
           const hrs = (new Date(sched.scheduled_end) - new Date(sched.scheduled_start)) / 3600000;
           stats[name].hoursWorked += hrs / n;
         }
-
-        if (hasReview) stats[name].reviews += 1;
       }
     }
 
@@ -96,7 +89,7 @@ export async function GET(request) {
       s.chargeRate = s.hoursWorked > 0 ? Math.round(s.revenue / s.hoursWorked) : 0;
     }
 
-    return NextResponse.json({ success: true, data: Object.values(stats), debugStatuses });
+    return NextResponse.json({ success: true, data: Object.values(stats) });
   } catch (err) {
     console.error('HCP API error:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
