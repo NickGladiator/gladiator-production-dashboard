@@ -24,6 +24,20 @@ function parseSheetDate(dateVal) {
   return new Date(dateVal);
 }
 
+// Upsells tab uses MM/DD/YYYY text dates (other tabs use DD/MM/YYYY), so it needs its own parser
+function parseUpsellDate(dateVal) {
+  if (!dateVal) return null;
+  if (typeof dateVal === 'string' && dateVal.includes('/')) {
+    const parts = dateVal.split('/');
+    return new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+  }
+  if (typeof dateVal === 'string' && dateVal.startsWith('Date(')) {
+    const parts = dateVal.replace('Date(', '').replace(')', '').split(',');
+    return new Date(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
+  }
+  return new Date(dateVal);
+}
+
 function parseShiftLength(shiftStr) {
   if (!shiftStr) return 0;
   const hourMatch = shiftStr.match(/(\d+)\s*hour/);
@@ -81,7 +95,7 @@ function parseUpsells(rows, startDate, endDate) {
     if (!row.c || !row.c[0] || !row.c[1]) continue;
     const tech = row.c[1].v?.trim();
     if (!tech || SKIP_NAMES.includes(tech.toLowerCase())) continue;
-    const date = parseSheetDate(row.c[0].v);
+    const date = parseUpsellDate(row.c[0].v);
     if (!date || date < startDate || date > endDate) continue;
     const subtotal = parseMoney(row.c[3]?.v);
     counts[tech]  = (counts[tech]  || 0) + 1;
