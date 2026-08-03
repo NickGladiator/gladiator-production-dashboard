@@ -66,7 +66,7 @@ export async function GET(request) {
       if (!assigned.length) continue;
 
       const n        = assigned.length;
-      const isCompleted = job.work_status === 'completed';
+      const isCompleted = job.work_status === 'complete rated' || job.work_status === 'complete unrated';
       const hasReview = (job.tags || []).some(
         t => typeof t === 'string' && t.toLowerCase() === '5 star google review'
       );
