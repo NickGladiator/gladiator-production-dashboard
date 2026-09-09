@@ -25,6 +25,12 @@ function parseLocal(str){const p=str.split("-").map(Number);return new Date(p[0]
 function friendlyRange(s,e){if(!s||!e)return"";const a=parseLocal(s).toLocaleDateString("en-US",{month:"short",day:"numeric"});const b=parseLocal(e).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});return a+" - "+b;}
 function getMedal(r){return["🥇","🥈","🥉"][r]??`#${r+1}`;}
 
+function serviceBreakdownText(t){
+  const bySvc=t.callbacksByService;
+  if(!bySvc||Object.keys(bySvc).length===0)return"";
+  return Object.entries(bySvc).sort((a,b)=>b[1]-a[1]).map(([svc,n])=>`${svc}: ${n}`).join(" • ");
+}
+
 function AnimatedBar({pct,color,delay=0,height=22}){
   const[w,setW]=useState(0);
   useEffect(()=>{const t=setTimeout(()=>setW(Math.max(pct,3)),delay);return()=>clearTimeout(t);},[pct,delay]);
@@ -80,7 +86,7 @@ function CategorySlide({category,techs}){
         {ranked.map((t,i)=>{
           const pct=category.higherIsBetter?((t[category.key]-min)/range)*100:((max-t[category.key])/range)*100;
           const isFirst=t._rank===0,isLast=i===total-1;
-          return(<div key={t.name} style={{display:"flex",alignItems:"center",gap:mob?6:10,opacity:isLast?0.55:1}}>
+          return(<div key={t.name} title={category.key==="callbackRate"?serviceBreakdownText(t):undefined} style={{display:"flex",alignItems:"center",gap:mob?6:10,opacity:isLast?0.55:1}}>
             <div style={{width:mob?22:30,fontSize:t._rank<3?(mob?13:16):fontSize,textAlign:"center",color:t._rank<3?C.white:"rgba(255,255,255,.45)",fontWeight:"bold",flexShrink:0}}>{getMedal(t._rank)}</div>
             <div style={{width:nameWidth,color:isFirst?C.brightOrange:C.white,fontSize,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>{t.name}</div>
             <AnimatedBar pct={Math.max(pct,3)} color={BAR_COLORS[t._rank]??"#1a1810"} delay={i*60} height={mob?16:22}/>
@@ -220,7 +226,7 @@ function DashboardCard({category,techs}){
         {ranked.map((t)=>{
           const pct=category.higherIsBetter?((t[category.key]-min)/range)*100:((max-t[category.key])/range)*100;
           const isFirst=t._rank===0;
-          return(<div key={t.name} style={{display:"flex",alignItems:"center",gap:6}}>
+          return(<div key={t.name} title={category.key==="callbackRate"?serviceBreakdownText(t):undefined} style={{display:"flex",alignItems:"center",gap:6}}>
             <div style={{width:20,fontSize:t._rank<3?12:10,textAlign:"center",flexShrink:0}}>{getMedal(t._rank)}</div>
             <div style={{width:110,fontSize:11,color:isFirst?C.brightOrange:C.white,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>{t.name}</div>
             <div style={{flex:1,height:6,background:"rgba(255,255,255,.06)",borderRadius:3,overflow:"hidden"}}>
