@@ -3,12 +3,24 @@ import { NextResponse } from 'next/server';
 const SHEET_ID = process.env.GOOGLE_SHEETS_ID;
 
 async function getSheetData(tabName) {
-  const encodedTab = encodeURIComponent(tabName);
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodedTab}`;
-  const res = await fetch(url);
-  const text = await res.text();
-  const json = JSON.parse(text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);/)[1]);
-  return json.table.rows;
+  try {
+    const encodedTab = encodeURIComponent(tabName);
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodedTab}`;
+    const res = await fetch(url);
+    const text = await res.text();
+    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);/);
+    if (!match) {
+      // Sheet tab not found, renamed, or Google returned an error page instead of data.
+      console.error(`Sheets API: tab "${tabName}" did not return valid gviz JSON. Response started with: ${text.slice(0, 200)}`);
+      return [];
+    }
+    const json = JSON.parse(match[1]);
+    return json.table?.rows || [];
+  } catch (err) {
+    // Don't let one broken tab take down the whole leaderboard.
+    console.error(`Sheets API: failed to read tab "${tabName}":`, err.message);
+    return [];
+  }
 }
 
 function parseSheetDate(dateVal) {
@@ -107,17 +119,34 @@ function parseUpsells(rows, startDate, endDate) {
   return { counts, dollars };
 }
 
+const UNTRACKED_SERVICE = 'Untracked service';
+
+// Columns (as of the "Service (what the service was)" addition):
+// A=0 Date of Job, B=1 Lead Tech, C=2 Other techs, D=3 Customer, E=4 Date of Callback,
+// F=5 Reason For Callback, G=6 Service, H=7 Valid Callback, I=8 Revisit Booked, J=9 Customer Happy
 function parseCallbacks(rows, startDate, endDate) {
   const counts = {};
+  const byService = {}; // { techName: { serviceName: count } }
+
+  const addService = (tech, service) => {
+    if (!byService[tech]) byService[tech] = {};
+    byService[tech][service] = (byService[tech][service] || 0) + 1;
+  };
+
   for (const row of rows) {
     if (!row.c || !row.c[0] || !row.c[1]) continue;
     const date = parseSheetDate(row.c[0].v);
     if (!date || date < startDate || date > endDate) continue;
-    const valid = row.c[6]?.v?.toString().trim().toLowerCase();
+    const valid = row.c[7]?.v?.toString().trim().toLowerCase();
     if (valid !== 'yes') continue;
+
+    const rawService = row.c[6]?.v?.toString().trim();
+    const service = rawService ? rawService : UNTRACKED_SERVICE;
+
     const leadTech = row.c[1].v?.trim();
     if (leadTech && !SKIP_NAMES.includes(leadTech.toLowerCase())) {
       counts[leadTech] = (counts[leadTech] || 0) + 1;
+      addService(leadTech, service);
     }
     const otherTechs = row.c[2]?.v?.toString().trim();
     if (otherTechs) {
@@ -125,11 +154,12 @@ function parseCallbacks(rows, startDate, endDate) {
         const name = t.trim();
         if (name && !SKIP_NAMES.includes(name.toLowerCase())) {
           counts[name] = (counts[name] || 0) + 1;
+          addService(name, service);
         }
       });
     }
   }
-  return counts;
+  return { counts, byService };
 }
 
 function parseTips(rows, startDate, endDate) {
@@ -244,7 +274,9 @@ export async function GET(request) {
     const sickDays  = countByTech(sickRows,  startDate, endDate);
     const yardSigns = countByTech(yardRows,  startDate, endDate);
     const upsells   = parseUpsells(upsellRows, startDate, endDate);
-    const callbacks = parseCallbacks(callbackRows, startDate, endDate);
+    const callbacksParsed = parseCallbacks(callbackRows, startDate, endDate);
+    const callbacks = callbacksParsed.counts;
+    const callbacksByService = callbacksParsed.byService;
     const p4p       = parseP4P(p4pRows, startDate, endDate, hourlyRates);
     const tips      = parseTips(tipRows, startDate, endDate);
     const reviews   = parseReviews(reviewRows, startDate, endDate);
@@ -271,6 +303,7 @@ export async function GET(request) {
         upsellCount:       upsells.counts[tech]        || 0,
         upsellDollars:     upsells.dollars[tech]       || 0,
         callbacks:         callbacks[tech]             || 0,
+        callbacksByService: callbacksByService[tech]   || {},
         hoursWorked:       p4p[tech]?.hoursWorked      ?? 0,
         chargeRate:        p4p[tech]?.chargeRate       ?? 0,
         bonus:             p4p[tech]?.bonus            ?? 0,
