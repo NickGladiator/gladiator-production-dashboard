@@ -86,11 +86,15 @@ function CategorySlide({category,techs}){
         {ranked.map((t,i)=>{
           const pct=category.higherIsBetter?((t[category.key]-min)/range)*100:((max-t[category.key])/range)*100;
           const isFirst=t._rank===0,isLast=i===total-1;
-          return(<div key={t.name} title={category.key==="callbackRate"?serviceBreakdownText(t):undefined} style={{display:"flex",alignItems:"center",gap:mob?6:10,opacity:isLast?0.55:1}}>
-            <div style={{width:mob?22:30,fontSize:t._rank<3?(mob?13:16):fontSize,textAlign:"center",color:t._rank<3?C.white:"rgba(255,255,255,.45)",fontWeight:"bold",flexShrink:0}}>{getMedal(t._rank)}</div>
-            <div style={{width:nameWidth,color:isFirst?C.brightOrange:C.white,fontSize,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>{t.name}</div>
-            <AnimatedBar pct={Math.max(pct,3)} color={BAR_COLORS[t._rank]??"#1a1810"} delay={i*60} height={mob?16:22}/>
-            <div style={{width:valWidth,textAlign:"right",color:isFirst?C.brightOrange:C.white,fontWeight:isFirst?"bold":"normal",fontSize:isFirst?fontSize+1:fontSize,flexShrink:0}}>{fmt(t[category.key],t)}</div>
+          const svcText=category.key==="callbackRate"&&t.callbacks>0?serviceBreakdownText(t):"";
+          return(<div key={t.name} style={{opacity:isLast?0.55:1}}>
+            <div style={{display:"flex",alignItems:"center",gap:mob?6:10}}>
+              <div style={{width:mob?22:30,fontSize:t._rank<3?(mob?13:16):fontSize,textAlign:"center",color:t._rank<3?C.white:"rgba(255,255,255,.45)",fontWeight:"bold",flexShrink:0}}>{getMedal(t._rank)}</div>
+              <div style={{width:nameWidth,color:isFirst?C.brightOrange:C.white,fontSize,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>{t.name}</div>
+              <AnimatedBar pct={Math.max(pct,3)} color={BAR_COLORS[t._rank]??"#1a1810"} delay={i*60} height={mob?16:22}/>
+              <div style={{width:valWidth,textAlign:"right",color:isFirst?C.brightOrange:C.white,fontWeight:isFirst?"bold":"normal",fontSize:isFirst?fontSize+1:fontSize,flexShrink:0}}>{fmt(t[category.key],t)}</div>
+            </div>
+            {svcText&&<div style={{marginLeft:mob?28:40,color:C.tan,fontSize:mob?8:10,opacity:.55,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{svcText}</div>}
           </div>);
         })}
       </div>
@@ -226,13 +230,17 @@ function DashboardCard({category,techs}){
         {ranked.map((t)=>{
           const pct=category.higherIsBetter?((t[category.key]-min)/range)*100:((max-t[category.key])/range)*100;
           const isFirst=t._rank===0;
-          return(<div key={t.name} title={category.key==="callbackRate"?serviceBreakdownText(t):undefined} style={{display:"flex",alignItems:"center",gap:6}}>
-            <div style={{width:20,fontSize:t._rank<3?12:10,textAlign:"center",flexShrink:0}}>{getMedal(t._rank)}</div>
-            <div style={{width:110,fontSize:11,color:isFirst?C.brightOrange:C.white,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>{t.name}</div>
-            <div style={{flex:1,height:6,background:"rgba(255,255,255,.06)",borderRadius:3,overflow:"hidden"}}>
-              <div style={{width:`${Math.max(pct,3)}%`,height:"100%",background:BAR_COLORS[t._rank]??"#1a1810",borderRadius:3}}/>
+          const svcText=category.key==="callbackRate"&&t.callbacks>0?serviceBreakdownText(t):"";
+          return(<div key={t.name}>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <div style={{width:20,fontSize:t._rank<3?12:10,textAlign:"center",flexShrink:0}}>{getMedal(t._rank)}</div>
+              <div style={{width:110,fontSize:11,color:isFirst?C.brightOrange:C.white,fontWeight:isFirst?"bold":"normal",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flexShrink:0}}>{t.name}</div>
+              <div style={{flex:1,height:6,background:"rgba(255,255,255,.06)",borderRadius:3,overflow:"hidden"}}>
+                <div style={{width:`${Math.max(pct,3)}%`,height:"100%",background:BAR_COLORS[t._rank]??"#1a1810",borderRadius:3}}/>
+              </div>
+              <div style={{width:80,textAlign:"right",fontSize:11,color:isFirst?C.brightOrange:C.tan,flexShrink:0}}>{fmt(t[category.key],t)}</div>
             </div>
-            <div style={{width:80,textAlign:"right",fontSize:11,color:isFirst?C.brightOrange:C.tan,flexShrink:0}}>{fmt(t[category.key],t)}</div>
+            {svcText&&<div style={{marginLeft:26,color:C.tan,fontSize:9,opacity:.55,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{svcText}</div>}
           </div>);
         })}
       </div>
