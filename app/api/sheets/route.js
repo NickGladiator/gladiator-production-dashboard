@@ -252,6 +252,31 @@ function parseP4P(rows, startDate, endDate, hourlyRates) {
   return result;
 }
 
+function buildRosterLookup(roster) {
+  const map = new Map();
+  roster.forEach(name => map.set(name.toLowerCase().trim(), name));
+  return map;
+}
+
+// Canonicalizes a {name: value} map's keys against the roster (case/whitespace-insensitive only —
+// this does not fix misspellings or nicknames, just casing/trim differences). Values are merged:
+// numbers are summed, nested objects (e.g. per-service callback counts) are summed leaf-by-leaf.
+function canonicalizeMap(map, rosterLookup) {
+  const result = {};
+  for (const [key, value] of Object.entries(map)) {
+    const canon = rosterLookup.get(key.toLowerCase().trim()) ?? key;
+    if (typeof value === 'object' && value !== null) {
+      result[canon] = result[canon] || {};
+      for (const [k2, v2] of Object.entries(value)) {
+        result[canon][k2] = (result[canon][k2] || 0) + v2;
+      }
+    } else {
+      result[canon] = (result[canon] || 0) + (value || 0);
+    }
+  }
+  return result;
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -271,26 +296,36 @@ export async function GET(request) {
       getActiveTechRoster(),
     ]);
 
-    const sickDays  = countByTech(sickRows,  startDate, endDate);
-    const yardSigns = countByTech(yardRows,  startDate, endDate);
-    const upsells   = parseUpsells(upsellRows, startDate, endDate);
-    const callbacksParsed = parseCallbacks(callbackRows, startDate, endDate);
-    const callbacks = callbacksParsed.counts;
-    const callbacksByService = callbacksParsed.byService;
-    const p4p       = parseP4P(p4pRows, startDate, endDate, hourlyRates);
-    const tips      = parseTips(tipRows, startDate, endDate);
-    const reviews   = parseReviews(reviewRows, startDate, endDate);
+    const sickDaysRaw  = countByTech(sickRows,  startDate, endDate);
+    const yardSignsRaw = countByTech(yardRows,  startDate, endDate);
+    const upsellsRaw   = parseUpsells(upsellRows, startDate, endDate);
+    const callbacksParsedRaw = parseCallbacks(callbackRows, startDate, endDate);
+    const p4pRaw       = parseP4P(p4pRows, startDate, endDate, hourlyRates);
+    const tipsRaw      = parseTips(tipRows, startDate, endDate);
+    const reviewsRaw   = parseReviews(reviewRows, startDate, endDate);
 
-    const allTechs = [...new Set([
-      ...activeRoster,
-      ...Object.keys(sickDays),
-      ...Object.keys(yardSigns),
-      ...Object.keys(upsells.counts),
-      ...Object.keys(callbacks),
-      ...Object.keys(p4p),
-      ...Object.keys(tips),
-      ...Object.keys(reviews),
-    ])];
+    // Fold any casing/whitespace variants of a roster name (e.g. "cameron hof" vs "Cameron Hof")
+    // into the roster's canonical spelling. This does NOT fix real misspellings or nicknames
+    // (e.g. "Matt Nova" vs roster's "Matthew Nova", or "Dylan Whijte") — those need a sheet fix,
+    // and until then that row's data won't count toward anyone.
+    const rosterLookup = buildRosterLookup(activeRoster);
+    const sickDays  = canonicalizeMap(sickDaysRaw,  rosterLookup);
+    const yardSigns = canonicalizeMap(yardSignsRaw, rosterLookup);
+    const upsellCounts  = canonicalizeMap(upsellsRaw.counts,  rosterLookup);
+    const upsellDollars = canonicalizeMap(upsellsRaw.dollars, rosterLookup);
+    const upsells = { counts: upsellCounts, dollars: upsellDollars };
+    const callbacks = canonicalizeMap(callbacksParsedRaw.counts, rosterLookup);
+    const callbacksByService = canonicalizeMap(callbacksParsedRaw.byService, rosterLookup);
+    const p4p  = canonicalizeMap(p4pRaw, rosterLookup);
+    const tips = canonicalizeMap(tipsRaw, rosterLookup);
+    const reviews = canonicalizeMap(reviewsRaw, rosterLookup);
+
+    // Only ever show techs from the "All techs" roster (status = Active). Any name that shows up
+    // in a metric tab but isn't an exact (or casing-only) match to the roster — a typo, or a
+    // customer's name typed into the wrong column — is dropped here rather than shown as a
+    // phantom "tech". Make sure every currently active tech is actually listed in "All techs"
+    // before relying on this, or they'll disappear from the whole leaderboard.
+    const allTechs = activeRoster;
 
     const hcpTechs = searchParams.get('techs') ? JSON.parse(searchParams.get('techs')) : null;
     const result = allTechs
