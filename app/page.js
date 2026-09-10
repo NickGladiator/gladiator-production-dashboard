@@ -263,6 +263,7 @@ function DashboardCard({category,techs,companyTotals}){
 function Dashboard({data,onBack}){
   const mob=useIsMobile();
   const{techs,dateRange,companyTotals}=data;
+  const overall=computeOverall(techs);
   const active=overall.filter(t=>t.active);
   const scoreMap=Object.fromEntries(overall.map(t=>[t.name,t.pts??0]));
   const legend=[
