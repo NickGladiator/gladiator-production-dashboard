@@ -25,6 +25,16 @@ function parseLocal(str){const p=str.split("-").map(Number);return new Date(p[0]
 function friendlyRange(s,e){if(!s||!e)return"";const a=parseLocal(s).toLocaleDateString("en-US",{month:"short",day:"numeric"});const b=parseLocal(e).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});return a+" - "+b;}
 function getMedal(r){return["🥇","🥈","🥉"][r]??`#${r+1}`;}
 
+// A killed/timed-out serverless function returns an empty body, which makes res.json() throw
+// a cryptic "Unexpected end of JSON input". This gives a message that actually explains what happened.
+async function safeJson(res, label) {
+  if (!res.ok) throw new Error(`${label} request failed (${res.status}). Try a shorter date range.`);
+  const text = await res.text();
+  if (!text) throw new Error(`${label} request timed out with no response. Try a shorter date range.`);
+  try { return JSON.parse(text); }
+  catch { throw new Error(`${label} returned an invalid response. Try a shorter date range.`); }
+}
+
 function serviceBreakdownText(t){
   const bySvc=t.callbacksByService;
   if(!bySvc||Object.keys(bySvc).length===0)return"";
@@ -189,7 +199,7 @@ function OverallSlide({techs}){
   );
 }
 
-function DashboardCard({category,techs}){
+function DashboardCard({category,techs,companyTotals}){
   const noData=!hasData(techs,category.key);
   const ranked=getRankings(techs,category.key,category.higherIsBetter);
   const vals=ranked.map(t=>t[category.key]);
@@ -204,8 +214,10 @@ function DashboardCard({category,techs}){
   }
   function companyTotal(){
     if(category.key==="callbackRate"){
-      const totalJobs=techs.reduce((s,t)=>s+(t.jobsCompleted??0),0);
-      const totalCbs=techs.reduce((s,t)=>s+(t.callbacks??0),0);
+      // Prefer true distinct counts from the server (a 2-tech job counts once); fall back to the
+      // old per-tech sum only if that data isn't present for some reason.
+      const totalJobs=companyTotals?.jobsCompleted??techs.reduce((s,t)=>s+(t.jobsCompleted??0),0);
+      const totalCbs=companyTotals?.callbacks??techs.reduce((s,t)=>s+(t.callbacks??0),0);
       const rate=totalJobs>0?Math.round((totalCbs/totalJobs)*100):0;
       return`${rate}% (${totalJobs} jobs / ${totalCbs} callbacks)`;
     }
@@ -214,7 +226,7 @@ function DashboardCard({category,techs}){
     if(category.key==="p4pBonus")return`$${techs.reduce((s,t)=>s+(t.p4pBonus??0),0).toFixed(2)}`;
     if(category.key==="yardSigns")return`${techs.reduce((s,t)=>s+(t.yardSigns??0),0)} signs`;
     if(category.key==="sickDays")return`${techs.reduce((s,t)=>s+(t.sickDays??0),0)} days`;
-    if(category.key==="reviews")return`${techs.reduce((s,t)=>s+(t.reviews??0),0)} reviews`;
+    if(category.key==="reviews")return`${companyTotals?.reviews??techs.reduce((s,t)=>s+(t.reviews??0),0)} reviews`;
     return null;
   }
   const total=companyTotal();
@@ -250,8 +262,7 @@ function DashboardCard({category,techs}){
 
 function Dashboard({data,onBack}){
   const mob=useIsMobile();
-  const{techs,dateRange}=data;
-  const overall=computeOverall(techs);
+  const{techs,dateRange,companyTotals}=data;
   const active=overall.filter(t=>t.active);
   const scoreMap=Object.fromEntries(overall.map(t=>[t.name,t.pts??0]));
   const legend=[
@@ -316,7 +327,7 @@ function Dashboard({data,onBack}){
           ))}
         </div>
       </div>
-      {CATEGORIES.map(cat=><DashboardCard key={cat.key} category={cat} techs={techs}/>)}
+      {CATEGORIES.map(cat=><DashboardCard key={cat.key} category={cat} techs={techs} companyTotals={companyTotals}/>)}
     </div>
   </div>);
 }
@@ -336,7 +347,7 @@ function SetupScreen({onGenerate}){
     setError("");setStatus("Connecting to Housecall Pro...");
     try{
       const hcpRes=await fetch(`/api/hcp?startDate=${start}&endDate=${end}`);
-      const hcpData=await hcpRes.json();
+      const hcpData=await safeJson(hcpRes,"Housecall Pro");
       if(hcpData.error)throw new Error("HCP: "+hcpData.error);
       setStatus("Loading Sheets & Slack...");
       const[sheetsRes,slackRes]=await Promise.all([
@@ -344,12 +355,17 @@ function SetupScreen({onGenerate}){
         fetch(`/api/slack?startDate=${start}&endDate=${end}`),
       ]);
       setStatus("Processing data...");
-      const sheetsData=await sheetsRes.json(),slackData=await slackRes.json();
+      const sheetsData=await safeJson(sheetsRes,"Sheets"),slackData=await safeJson(slackRes,"Slack");
       if(sheetsData.error)throw new Error("Sheets: "+sheetsData.error);
       if(slackData.error)throw new Error("Slack: "+slackData.error);
       const merged=mergeData(hcpData.data,sheetsData.data,slackData.data);
+      const companyTotals={
+        jobsCompleted: hcpData.companyJobsCompleted ?? 0,
+        callbacks:     sheetsData.totalCallbackJobs ?? 0,
+        reviews:       sheetsData.totalReviews ?? 0,
+      };
       setStatus("");
-      onGenerate({techs:merged,dateRange:range,mode});
+      onGenerate({techs:merged,dateRange:range,mode,companyTotals});
     }catch(err){setStatus("");setError(err.message);}
   };
 
