@@ -70,7 +70,7 @@ function CategorySlide({category,techs}){
   const rowGap=mob?(total>8?3:5):(total>8?5:9);
   const fontSize=mob?(total>8?10:11):(total>8?12:13);
   const nameWidth=mob?90:140;
-  const valWidth=mob?(category.key==="callbackRate"?85:70):120;
+  const valWidth=mob?(category.key==="callbackRate"||category.key==="sameDayInvoiceRate"?85:70):120;
   const srcColor=SOURCE_COLORS[category.source]||C.tan;
   function fmt(v,t){
     if(category.key==="tips")return`$${v.toFixed(2)}`;
@@ -78,6 +78,10 @@ function CategorySlide({category,techs}){
     if(category.key==="callbackRate"){
       const jobs=t.jobsCompleted??0,cbs=t.callbacks??0;
       return mob?`${v}% (${jobs}/${cbs})`:`${v}% (${jobs}j / ${cbs}cb)`;
+    }
+    if(category.key==="sameDayInvoiceRate"){
+      const jobs=t.jobsCompleted??0,sd=t.sameDayInvoices??0;
+      return mob?`${v}% (${sd}/${jobs})`:`${v}% (${sd}/${jobs} jobs)`;
     }
     if(category.key==="upsellDollars")return`$${v.toFixed(2)}`;
     return v;
@@ -208,6 +212,7 @@ function DashboardCard({category,techs,companyTotals}){
     if(category.key==="tips")return`$${v.toFixed(2)}`;
     if(category.key==="chargeRate")return`$${v.toFixed(0)}/hr`;
     if(category.key==="callbackRate")return`${v}% (${t.jobsCompleted??0}/${t.callbacks??0})`;
+    if(category.key==="sameDayInvoiceRate")return`${v}% (${t.sameDayInvoices??0}/${t.jobsCompleted??0})`;
     if(category.key==="upsellDollars")return`$${v.toFixed(2)}`;
     if(category.key==="p4pBonus")return`$${v.toFixed(2)}`;
     return v;
@@ -227,6 +232,12 @@ function DashboardCard({category,techs,companyTotals}){
     if(category.key==="yardSigns")return`${techs.reduce((s,t)=>s+(t.yardSigns??0),0)} signs`;
     if(category.key==="sickDays")return`${techs.reduce((s,t)=>s+(t.sickDays??0),0)} days`;
     if(category.key==="reviews")return`${companyTotals?.reviews??techs.reduce((s,t)=>s+(t.reviews??0),0)} reviews`;
+    if(category.key==="sameDayInvoiceRate"){
+      const totalJobs=companyTotals?.jobsCompleted??techs.reduce((s,t)=>s+(t.jobsCompleted??0),0);
+      const totalSameDay=companyTotals?.sameDayInvoices??techs.reduce((s,t)=>s+(t.sameDayInvoices??0),0);
+      const rate=totalJobs>0?Math.round((totalSameDay/totalJobs)*100):0;
+      return`${rate}% (${totalSameDay}/${totalJobs} jobs)`;
+    }
     return null;
   }
   const total=companyTotal();
@@ -270,6 +281,7 @@ function Dashboard({data,onBack}){
     {icon:"📞",label:"Callback Rate",weight:"3x",desc:"↓ lower",color:"#ff6b6b"},
     {icon:"💵",label:"P4P Bonus",weight:"2x",desc:"↑ higher",color:"#FE8909"},
     {icon:"⭐",label:"Reviews",weight:"2x",desc:"↑ higher",color:"#FE8909"},
+    {icon:"🧾",label:"Same-Day Invoice",weight:"2x",desc:"↑ higher",color:"#FE8909"},
     {icon:"📈",label:"Upsells",weight:"1.5x",desc:"↑ higher",color:"#FE8909"},
     {icon:"💰",label:"Tips",weight:"1x",desc:"↑ higher",color:"#8F774D"},
     {icon:"🪧",label:"Yard Signs",weight:"1x",desc:"↑ higher",color:"#8F774D"},
@@ -364,6 +376,7 @@ function SetupScreen({onGenerate}){
         jobsCompleted: hcpData.companyJobsCompleted ?? 0,
         callbacks:     sheetsData.totalCallbackJobs ?? 0,
         reviews:       sheetsData.totalReviews ?? 0,
+        sameDayInvoices: hcpData.companySameDayInvoices ?? 0,
       };
       setStatus("");
       onGenerate({techs:merged,dateRange:range,mode,companyTotals});
