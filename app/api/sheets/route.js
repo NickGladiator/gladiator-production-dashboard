@@ -127,6 +127,7 @@ const UNTRACKED_SERVICE = 'Untracked service';
 function parseCallbacks(rows, startDate, endDate) {
   const counts = {};
   const byService = {}; // { techName: { serviceName: count } }
+  let totalCallbackJobs = 0; // distinct callback events (one row = one job), not summed per-tech
 
   const addService = (tech, service) => {
     if (!byService[tech]) byService[tech] = {};
@@ -139,6 +140,8 @@ function parseCallbacks(rows, startDate, endDate) {
     if (!date || date < startDate || date > endDate) continue;
     const valid = row.c[7]?.v?.toString().trim().toLowerCase();
     if (valid !== 'yes') continue;
+
+    totalCallbackJobs++;
 
     const rawService = row.c[6]?.v?.toString().trim();
     const service = rawService ? rawService : UNTRACKED_SERVICE;
@@ -159,7 +162,7 @@ function parseCallbacks(rows, startDate, endDate) {
       });
     }
   }
-  return { counts, byService };
+  return { counts, byService, total: totalCallbackJobs };
 }
 
 function parseTips(rows, startDate, endDate) {
@@ -178,10 +181,12 @@ function parseTips(rows, startDate, endDate) {
 
 function parseReviews(rows, startDate, endDate) {
   const counts = {};
+  let total = 0; // distinct review rows — a review naming 2 techs still counts as 1 review
   for (const row of rows) {
     if (!row.c || !row.c[0]) continue;
     const date = parseSheetDate(row.c[0].v);
     if (!date || isNaN(date) || date < startDate || date > endDate) continue;
+    total++;
     [row.c[1]?.v, row.c[2]?.v].forEach(val => {
       const name = val?.toString().trim();
       if (name && !SKIP_NAMES.includes(name.toLowerCase())) {
@@ -189,7 +194,7 @@ function parseReviews(rows, startDate, endDate) {
       }
     });
   }
-  return counts;
+  return { counts, total };
 }
 
 function parseP4P(rows, startDate, endDate, hourlyRates) {
@@ -302,7 +307,8 @@ export async function GET(request) {
     const callbacksParsedRaw = parseCallbacks(callbackRows, startDate, endDate);
     const p4pRaw       = parseP4P(p4pRows, startDate, endDate, hourlyRates);
     const tipsRaw      = parseTips(tipRows, startDate, endDate);
-    const reviewsRaw   = parseReviews(reviewRows, startDate, endDate);
+    const reviewsParsedRaw = parseReviews(reviewRows, startDate, endDate);
+    const reviewsRaw   = reviewsParsedRaw.counts;
 
     // Fold any casing/whitespace variants of a roster name (e.g. "cameron hof" vs "Cameron Hof")
     // into the roster's canonical spelling. This does NOT fix real misspellings or nicknames
@@ -347,7 +353,7 @@ export async function GET(request) {
         reviews:           reviews[tech]               || 0,
       }));
 
-    return NextResponse.json({ success: true, data: result });
+    return NextResponse.json({ success: true, data: result, totalCallbackJobs: callbacksParsedRaw.total, totalReviews: reviewsParsedRaw.total });
   } catch (err) {
     console.error('Sheets API error:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
