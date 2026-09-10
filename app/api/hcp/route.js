@@ -5,15 +5,28 @@ const BASE = 'https://api.housecallpro.com';
 const headers = { Authorization: `Token ${HCP_API_KEY}`, 'Content-Type': 'application/json' };
 
 async function fetchAllPages(endpoint) {
-  let results = [], page = 1;
-  while (true) {
-    const res = await fetch(`${BASE}${endpoint}&page=${page}&page_size=100`, { headers });
-    if (!res.ok) throw new Error(`HCP error: ${res.status} ${endpoint}`);
-    const data = await res.json();
-    const items = data.jobs || data.employees || [];
-    results = results.concat(items);
-    if (items.length < 100) break;
-    page++;
+  const PAGE_SIZE = 100;
+  const BATCH_SIZE = 5; // fetch 5 pages concurrently instead of one at a time —
+                        // long date ranges (many pages) were hitting Netlify's
+                        // function execution time limit when fetched serially.
+  let results = [];
+  let page = 1;
+  let done = false;
+
+  while (!done) {
+    const pagesToFetch = Array.from({ length: BATCH_SIZE }, (_, i) => page + i);
+    const batch = await Promise.all(pagesToFetch.map(async (p) => {
+      const res = await fetch(`${BASE}${endpoint}&page=${p}&page_size=${PAGE_SIZE}`, { headers });
+      if (!res.ok) throw new Error(`HCP error: ${res.status} ${endpoint} (page ${p})`);
+      const data = await res.json();
+      return data.jobs || data.employees || [];
+    }));
+
+    for (const items of batch) {
+      results = results.concat(items);
+      if (items.length < PAGE_SIZE) done = true;
+    }
+    page += BATCH_SIZE;
   }
   return results;
 }
@@ -35,8 +48,11 @@ export async function GET(request) {
     if (!empRes.ok) throw new Error(`HCP error: ${empRes.status} /employees`);
     const employees = (await empRes.json()).employees || [];
     const exclude   = ['Nick Preisenhammer'];
-    // These techs are misclassified as "office staff" in Housecall Pro but are actually field techs
-    const includeOverride = ['Keith Mayne'];
+    // These techs are misclassified as "office staff" (or some other non-"field tech" role) in
+    // Housecall Pro but are actually field techs. Dylan White and Logan Brodrecht were showing
+    // 0 jobs/hours despite clearly working (real callbacks/yard signs/reviews on record), which
+    // is the same symptom Keith Mayne had — add anyone else who shows 0 jobsCompleted here too.
+    const includeOverride = ['Keith Mayne', 'Dylan White', 'Logan Brodrecht'];
     const techs = employees.filter(e => {
       const name = `${e.first_name} ${e.last_name}`.trim();
       if (exclude.includes(name)) return false;
@@ -62,12 +78,15 @@ export async function GET(request) {
       };
     }
 
+    let companyJobsCompleted = 0; // distinct completed jobs — a 2-tech job still counts as 1
+
     for (const job of jobs) {
       const assigned = job.assigned_employees || [];
       if (!assigned.length) continue;
 
       const n = assigned.length;
       const isCompleted = job.work_status === 'complete rated' || job.work_status === 'complete unrated';
+      if (isCompleted) companyJobsCompleted++;
 
       for (const emp of assigned) {
         const name = `${emp.first_name} ${emp.last_name}`.trim();
@@ -92,7 +111,7 @@ export async function GET(request) {
       s.chargeRate = s.hoursWorked > 0 ? Math.round(s.revenue / s.hoursWorked) : 0;
     }
 
-    return NextResponse.json({ success: true, data: Object.values(stats) });
+    return NextResponse.json({ success: true, data: Object.values(stats), companyJobsCompleted });
   } catch (err) {
     console.error('HCP API error:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
