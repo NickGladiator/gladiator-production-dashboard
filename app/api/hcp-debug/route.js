@@ -18,13 +18,24 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const jobId = searchParams.get('jobId');
 
-    // A few recent jobs, no filter — figuring out the right work_status filter syntax isn't
-    // worth more attempts right now; we just need to see real job field names.
-    const jobsRes = await fetch(`${BASE}/jobs?page=1&page_size=5`, { headers });
+    // A bigger, unfiltered page so we can find real completed jobs client-side (the work_status
+    // array-filter syntax kept rejecting requests, not worth more guessing) — specifically to
+    // check whether work_timestamps.completed_at actually gets populated in this account.
+    const jobsRes = await fetch(`${BASE}/jobs?page=1&page_size=100`, { headers });
     const jobsBody = await jobsRes.text();
     let jobsData;
     try { jobsData = JSON.parse(jobsBody); } catch { jobsData = { raw: jobsBody }; }
     if (!jobsRes.ok) jobsData = { error: `jobs request failed (${jobsRes.status})`, body: jobsBody };
+    const allJobs = jobsData.jobs ?? (Array.isArray(jobsData) ? jobsData : []);
+    const completedJobs = allJobs.filter(j => j.work_status === 'complete rated' || j.work_status === 'complete unrated').slice(0, 5);
+
+    // Recent estimates — for the sales-shoutout project: need to see if there's a clear
+    // "created by" / "sold by" rep field, and how line items break out by service.
+    const estimatesRes = await fetch(`${BASE}/estimates?page=1&page_size=5`, { headers });
+    const estimatesBody = await estimatesRes.text();
+    let estimatesData;
+    try { estimatesData = JSON.parse(estimatesBody); } catch { estimatesData = { raw: estimatesBody }; }
+    if (!estimatesRes.ok) estimatesData = { error: `estimates request failed (${estimatesRes.status})`, body: estimatesBody };
 
     // Invoices — filtered to one job if a jobId is given, otherwise just the most recent few
     const invoiceEndpoint = jobId
@@ -37,9 +48,11 @@ export async function GET(request) {
     if (!invoicesRes.ok) invoicesData = { error: `invoices request failed (${invoicesRes.status})`, body: invoicesBody, endpointTried: invoiceEndpoint };
 
     return NextResponse.json({
-      note: 'Temporary diagnostic output — compare a job\'s "id" field below to an invoice\'s "job_id" field to match them up.',
-      sampleJobs: jobsData.jobs ?? jobsData,
+      note: 'sampleCompletedJobs is what actually matters right now — check whether work_timestamps.completed_at is populated on real completed jobs.',
+      sampleCompletedJobs: completedJobs,
+      totalJobsFetched: allJobs.length,
       sampleInvoices: invoicesData.invoices ?? invoicesData,
+      sampleEstimates: estimatesData.estimates ?? estimatesData,
     }, { status: 200 });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
