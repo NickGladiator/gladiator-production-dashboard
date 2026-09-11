@@ -280,7 +280,7 @@ function Dashboard({data,onBack}){
     {icon:"📞",label:"Callback Rate",weight:"3x",desc:"↓ lower",color:"#ff6b6b"},
     {icon:"💵",label:"P4P Bonus",weight:"2x",desc:"↑ higher",color:"#FE8909"},
     {icon:"⭐",label:"Reviews",weight:"2x",desc:"↑ higher",color:"#FE8909"},
-    {icon:"🧾",label:"Missed Same-Day",weight:"2x",desc:"↓ lower",color:"#ff6b6b"},
+    {icon:"🧾",label:"Jobs Finished & Invoices Sent",weight:"2x",desc:"↓ lower",color:"#ff6b6b"},
     {icon:"📈",label:"Upsells",weight:"1.5x",desc:"↑ higher",color:"#FE8909"},
     {icon:"💰",label:"Tips",weight:"1x",desc:"↑ higher",color:"#8F774D"},
     {icon:"🪧",label:"Yard Signs",weight:"1x",desc:"↑ higher",color:"#8F774D"},
