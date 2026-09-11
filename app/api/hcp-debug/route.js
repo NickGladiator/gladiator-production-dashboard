@@ -18,11 +18,9 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const jobId = searchParams.get('jobId');
 
-    // A few recently-completed jobs — real job_id, work_status, and schedule field names
-    const jobsRes = await fetch(
-      `${BASE}/jobs?page=1&page_size=5&work_status%5B%5D=complete+rated&work_status%5B%5D=complete+unrated`,
-      { headers }
-    );
+    // A few recent jobs, no filter — figuring out the right work_status filter syntax isn't
+    // worth more attempts right now; we just need to see real job field names.
+    const jobsRes = await fetch(`${BASE}/jobs?page=1&page_size=5`, { headers });
     const jobsBody = await jobsRes.text();
     let jobsData;
     try { jobsData = JSON.parse(jobsBody); } catch { jobsData = { raw: jobsBody }; }
