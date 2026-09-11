@@ -19,7 +19,10 @@ export async function GET(request) {
     const jobId = searchParams.get('jobId');
 
     // A few recently-completed jobs — real job_id, work_status, and schedule field names
-    const jobsRes = await fetch(`${BASE}/jobs?page=1&page_size=5&work_status=completed`, { headers });
+    const jobsRes = await fetch(
+      `${BASE}/jobs?page=1&page_size=5&work_status%5B%5D=complete+rated&work_status%5B%5D=complete+unrated`,
+      { headers }
+    );
     const jobsBody = await jobsRes.text();
     let jobsData;
     try { jobsData = JSON.parse(jobsBody); } catch { jobsData = { raw: jobsBody }; }
