@@ -49,12 +49,16 @@ async function fetchInvoicesForJobs(jobIds) {
   return invoicesByJob;
 }
 
-// YYYY-MM-DD in UTC. Good enough for "same calendar day" comparisons here — timestamps from
-// Housecall Pro are UTC, and a job/invoice near midnight ET could in principle land on the
-// "wrong" side of this, but that's a rare edge case and matches how the rest of this API already
-// treats dates.
-function dateStr(iso) {
-  return iso ? new Date(iso).toISOString().slice(0, 10) : null;
+// YYYY-MM-DD in a given IANA timezone (e.g. "America/Toronto") — using the job's own timezone
+// avoids the UTC-midnight edge case from before.
+function localDateStr(iso, tz) {
+  if (!iso) return null;
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' })
+      .format(new Date(iso));
+  } catch {
+    return new Date(iso).toISOString().slice(0, 10);
+  }
 }
 
 export async function GET(request) {
@@ -101,15 +105,16 @@ export async function GET(request) {
         tips:            0,
         hoursWorked:     0,
         chargeRate:      0,
-        sameDayInvoices: 0, // completed jobs where an invoice was sent same-day (bonus eligibility)
+        missedSameDay:   0, // completed jobs that DIDN'T finish + get invoiced same-day as scheduled
       };
     }
 
-    let companyJobsCompleted = 0;   // distinct completed jobs — a 2-tech job still counts as 1
-    let companySameDayInvoices = 0; // distinct completed jobs with a same-day-sent invoice
+    let companyJobsCompleted = 0; // distinct completed jobs — a 2-tech job still counts as 1
+    let companyMissedSameDay = 0; // distinct completed jobs that missed the same-day rule
 
-    // Only bother pulling invoices for jobs that actually finished — that's the whole point of
-    // this check (an unfinished job was never going to have a same-day invoice anyway).
+    // Only bother pulling invoices for jobs that actually finished — an unfinished job is tracked
+    // separately (per Nick: "if they're unable to complete a job... we can just track it as
+    // unfinished") and never counts as a miss here.
     const completedJobIds = jobs
       .filter(j => j.work_status === 'complete rated' || j.work_status === 'complete unrated')
       .map(j => j.id);
@@ -123,14 +128,23 @@ export async function GET(request) {
       const isCompleted = job.work_status === 'complete rated' || job.work_status === 'complete unrated';
       if (isCompleted) companyJobsCompleted++;
 
-      // Same-day invoice: at least one invoice tied to this job was actually sent (sent_at set,
-      // not just created) on the same calendar day the job was scheduled for.
-      let sameDayInvoice = false;
+      // Bonus-eligible ("not missed") requires BOTH:
+      //   1. the job was actually marked finished on the same calendar day it was scheduled for
+      //      (not just eventually finished later)
+      //   2. an invoice for the job was created that same day
+      // Housecall Pro doesn't track a real "sent" action for this account (confirmed — every
+      // invoice's sent_at is null, even paid ones), so invoice creation date is the closest
+      // available signal for "the invoice went out."
+      let missedSameDay = false;
       if (isCompleted) {
-        const jobDate = dateStr(job.schedule?.scheduled_start);
-        const jobInvoices = invoicesByJob[job.id] || [];
-        sameDayInvoice = jobDate != null && jobInvoices.some(inv => inv.sent_at && dateStr(inv.sent_at) === jobDate);
-        if (sameDayInvoice) companySameDayInvoices++;
+        const tz = job.schedule?.time_zone;
+        const scheduledDate = localDateStr(job.schedule?.scheduled_start, tz);
+        const completedDate = localDateStr(job.work_timestamps?.completed_at, tz);
+        const jobInvoices   = invoicesByJob[job.id] || [];
+        const invoicedSameDay = jobInvoices.some(inv => localDateStr(inv.invoice_date, tz) === scheduledDate);
+        const completedSameDay = scheduledDate != null && completedDate === scheduledDate;
+        missedSameDay = !(completedSameDay && invoicedSameDay);
+        if (missedSameDay) companyMissedSameDay++;
       }
 
       for (const emp of assigned) {
@@ -141,7 +155,7 @@ export async function GET(request) {
           stats[name].jobsCompleted += 1;
           stats[name].revenue       += (job.total_amount || 0) / n;
           stats[name].tips          += (job.tip_amount || 0) / n;
-          if (sameDayInvoice) stats[name].sameDayInvoices += 1;
+          if (missedSameDay) stats[name].missedSameDay += 1;
         }
 
         const sched = job.schedule || {};
@@ -161,7 +175,7 @@ export async function GET(request) {
       success: true,
       data: Object.values(stats),
       companyJobsCompleted,
-      companySameDayInvoices,
+      companyMissedSameDay,
     });
   } catch (err) {
     console.error('HCP API error:', err);
