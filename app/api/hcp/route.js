@@ -6,9 +6,9 @@ const headers = { Authorization: `Token ${HCP_API_KEY}`, 'Content-Type': 'applic
 
 async function fetchAllPages(endpoint) {
   const PAGE_SIZE = 100;
-  const BATCH_SIZE = 5; // fetch 5 pages concurrently instead of one at a time —
-                        // long date ranges (many pages) were hitting Netlify's
-                        // function execution time limit when fetched serially.
+  const BATCH_SIZE = 10; // fetch 10 pages concurrently — bumped from 5 after the same-day-invoice
+                        // feature added extra per-job requests downstream, which was pushing
+                        // wide date ranges past Netlify's function execution time limit (502s).
   let results = [];
   let page = 1;
   let done = false;
@@ -32,9 +32,10 @@ async function fetchAllPages(endpoint) {
 }
 
 // Fetch invoices for a batch of job IDs concurrently (bounded), rather than one request per job
-// sequentially — same reasoning as fetchAllPages: keep this under Netlify's execution time limit.
+// sequentially. This is the main cost for wide date ranges — one extra HTTP round trip per
+// completed job — so the batch size here matters more than the one above for avoiding timeouts.
 async function fetchInvoicesForJobs(jobIds) {
-  const BATCH_SIZE = 8;
+  const BATCH_SIZE = 25;
   const invoicesByJob = {};
   for (let i = 0; i < jobIds.length; i += BATCH_SIZE) {
     const batch = jobIds.slice(i, i + BATCH_SIZE);
