@@ -1,32 +1,41 @@
 import { NextResponse } from 'next/server';
+import { inflateSync } from 'node:zlib';
+import { countOriginalJobs, jobLocalDate } from '../../../lib/job-counts.mjs';
 
 const HCP_API_KEY = process.env.HCP_API_KEY;
 const BASE = 'https://api.housecallpro.com';
 const headers = { Authorization: `Token ${HCP_API_KEY}`, 'Content-Type': 'application/json' };
 
+async function fetchHcp(path) {
+  let res;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    res = await fetch(`${BASE}${path}`, { headers });
+    if (res.status !== 429 && res.status < 500) break;
+    if (attempt < 2) {
+      const retry = Number(res.headers.get('retry-after'));
+      await new Promise(resolve => setTimeout(resolve, Math.min(5000, retry > 0 ? retry * 1000 : 1000 * (attempt + 1))));
+    }
+  }
+  if (!res.ok) throw new Error(`Housecall request failed (${res.status}). Please try again shortly.`);
+  return res.json();
+}
+
 async function fetchAllPages(endpoint) {
   const PAGE_SIZE = 100;
-  const BATCH_SIZE = 10; // fetch 10 pages concurrently — bumped from 5 after the same-day-invoice
-                        // feature added extra per-job requests downstream, which was pushing
-                        // wide date ranges past Netlify's function execution time limit (502s).
-  let results = [];
-  let page = 1;
-  let done = false;
-
-  while (!done) {
-    const pagesToFetch = Array.from({ length: BATCH_SIZE }, (_, i) => page + i);
-    const batch = await Promise.all(pagesToFetch.map(async (p) => {
-      const res = await fetch(`${BASE}${endpoint}&page=${p}&page_size=${PAGE_SIZE}`, { headers });
-      if (!res.ok) throw new Error(`HCP error: ${res.status} ${endpoint} (page ${p})`);
-      const data = await res.json();
-      return data.jobs || data.employees || [];
-    }));
-
-    for (const items of batch) {
-      results = results.concat(items);
-      if (items.length < PAGE_SIZE) done = true;
+  const first = await fetchHcp(`${endpoint}&page=1&page_size=${PAGE_SIZE}`);
+  let results = first.jobs || [];
+  // Read the reported page count instead of requesting ten pages for every month.
+  if (Number.isInteger(first.total_pages)) {
+    for (let page = 2; page <= first.total_pages; page++) {
+      const data = await fetchHcp(`${endpoint}&page=${page}&page_size=${PAGE_SIZE}`);
+      results.push(...(data.jobs || []));
     }
-    page += BATCH_SIZE;
+  } else {
+    for (let page = 2; results.length === (page - 1) * PAGE_SIZE; page++) {
+      const data = await fetchHcp(`${endpoint}&page=${page}&page_size=${PAGE_SIZE}`);
+      results.push(...(data.jobs || []));
+      if (!(data.jobs || []).length) break;
+    }
   }
   return results;
 }
@@ -35,7 +44,7 @@ async function fetchAllPages(endpoint) {
 // sequentially. This is the main cost for wide date ranges — one extra HTTP round trip per
 // completed job — so the batch size here matters more than the one above for avoiding timeouts.
 async function fetchInvoicesForJobs(jobIds) {
-  const BATCH_SIZE = 25;
+  const BATCH_SIZE = 5;
   const invoicesByJob = {};
   for (let i = 0; i < jobIds.length; i += BATCH_SIZE) {
     const batch = jobIds.slice(i, i + BATCH_SIZE);
@@ -71,13 +80,12 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Missing startDate or endDate' }, { status: 400 });
     }
 
-    const startISO = new Date(startDate).toISOString();
-    const endISO   = new Date(endDate + 'T23:59:59').toISOString();
+    // Fetch a broad UTC window, then apply the exact local calendar dates below.
+    const startISO = new Date(Date.parse(startDate + 'T00:00:00Z') - 86400000).toISOString();
+    const endISO = new Date(Date.parse(endDate + 'T00:00:00Z') + 2 * 86400000).toISOString();
 
     // Fetch field techs
-    const empRes = await fetch(`${BASE}/employees?page=1&page_size=100`, { headers });
-    if (!empRes.ok) throw new Error(`HCP error: ${empRes.status} /employees`);
-    const employees = (await empRes.json()).employees || [];
+    const employees = (await fetchHcp('/employees?page=1&page_size=100')).employees || [];
     const exclude   = ['Nick Preisenhammer'];
     // These techs are misclassified as "office staff" (or some other non-"field tech" role) in
     // Housecall Pro but are actually field techs. Dylan White and Logan Brodrecht were showing
@@ -91,9 +99,18 @@ export async function GET(request) {
     });
 
     // Fetch all jobs in date range
-    const jobs = await fetchAllPages(
+    const fetchedJobs = await fetchAllPages(
       `/jobs?scheduled_start_min=${startISO}&scheduled_start_max=${endISO}`
     );
+    const jobs = [...new Map(fetchedJobs.map(job => [job.id, job])).values()].filter(job => {
+      const date = jobLocalDate(job);
+      return date && date >= startDate && date <= endDate;
+    });
+    const reviewedRules = process.env.JOB_COUNT_OVERRIDES_Z
+      ? inflateSync(Buffer.from(process.env.JOB_COUNT_OVERRIDES_Z, 'base64')).toString('utf8')
+      : process.env.JOB_COUNT_OVERRIDES || '{}';
+    const overrides = JSON.parse(reviewedRules);
+    const jobCounts = countOriginalJobs(jobs, overrides);
 
     // Build per-tech stats
     const stats = {};
@@ -102,6 +119,7 @@ export async function GET(request) {
       stats[name] = {
         tech:            name,
         jobsCompleted:   0,
+        visitsCompleted: 0,
         revenue:         0,
         tips:            0,
         hoursWorked:     0,
@@ -110,7 +128,7 @@ export async function GET(request) {
       };
     }
 
-    let companyJobsCompleted = 0; // distinct completed jobs — a 2-tech job still counts as 1
+    const companyJobsCompleted = jobCounts.jobsCompleted;
     let companyMissedSameDay = 0; // distinct completed jobs that missed the same-day rule
 
     // Only bother pulling invoices for jobs that actually finished — an unfinished job is tracked
@@ -127,7 +145,6 @@ export async function GET(request) {
 
       const n = assigned.length;
       const isCompleted = job.work_status === 'complete rated' || job.work_status === 'complete unrated';
-      if (isCompleted) companyJobsCompleted++;
 
       // Bonus-eligible ("not missed") requires BOTH:
       //   1. the job was actually marked finished on the same calendar day it was scheduled for
@@ -153,7 +170,7 @@ export async function GET(request) {
         if (!stats[name]) continue;
 
         if (isCompleted) {
-          stats[name].jobsCompleted += 1;
+          stats[name].visitsCompleted += 1;
           stats[name].revenue       += (job.total_amount || 0) / n;
           stats[name].tips          += (job.tip_amount || 0) / n;
           if (missedSameDay) stats[name].missedSameDay += 1;
@@ -169,6 +186,7 @@ export async function GET(request) {
 
     for (const name of Object.keys(stats)) {
       const s = stats[name];
+      s.jobsCompleted = jobCounts.perTech[name] || 0;
       s.chargeRate = s.hoursWorked > 0 ? Math.round(s.revenue / s.hoursWorked) : 0;
     }
 
@@ -176,6 +194,10 @@ export async function GET(request) {
       success: true,
       data: Object.values(stats),
       companyJobsCompleted,
+      companyCompletedVisits: jobCounts.completedVisits,
+      companyDistinctOriginalJobs: jobCounts.distinctOriginalJobs,
+      companyCorrectiveOnlyJobs: jobCounts.correctiveOnlyJobs,
+      companyUnclassifiedJobs: jobCounts.unclassifiedJobs,
       companyMissedSameDay,
     });
   } catch (err) {
