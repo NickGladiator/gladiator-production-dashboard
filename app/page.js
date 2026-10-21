@@ -80,8 +80,8 @@ function CategorySlide({category,techs}){
       return mob?`${v}% (${jobs}/${cbs})`:`${v}% (${jobs}j / ${cbs}cb)`;
     }
     if(category.key==="missedSameDay"){
-      const jobs=t.jobsCompleted??0,missed=t.missedSameDay??0;
-      return mob?`${missed}/${jobs} missed`:`${missed} missed (of ${jobs} jobs)`;
+      const jobs=t.visitsCompleted??t.jobsCompleted??0,missed=t.missedSameDay??0;
+      return mob?`${missed}/${jobs} missed`:`${missed} missed (of ${jobs} visits)`;
     }
     if(category.key==="upsellDollars")return`$${v.toFixed(2)}`;
     return v;
@@ -212,7 +212,7 @@ function DashboardCard({category,techs,companyTotals}){
     if(category.key==="tips")return`$${v.toFixed(2)}`;
     if(category.key==="chargeRate")return`$${v.toFixed(0)}/hr`;
     if(category.key==="callbackRate")return`${v}% (${t.jobsCompleted??0}/${t.callbacks??0})`;
-    if(category.key==="missedSameDay")return`${v} missed (${t.jobsCompleted??0} jobs)`;
+    if(category.key==="missedSameDay")return`${v} missed (${t.visitsCompleted??t.jobsCompleted??0} visits)`;
     if(category.key==="upsellDollars")return`$${v.toFixed(2)}`;
     if(category.key==="p4pBonus")return`$${v.toFixed(2)}`;
     return v;
@@ -233,9 +233,9 @@ function DashboardCard({category,techs,companyTotals}){
     if(category.key==="sickDays")return`${techs.reduce((s,t)=>s+(t.sickDays??0),0)} days`;
     if(category.key==="reviews")return`${companyTotals?.reviews??techs.reduce((s,t)=>s+(t.reviews??0),0)} reviews`;
     if(category.key==="missedSameDay"){
-      const totalJobs=companyTotals?.jobsCompleted??techs.reduce((s,t)=>s+(t.jobsCompleted??0),0);
+      const totalJobs=companyTotals?.completedVisits??techs.reduce((s,t)=>s+(t.jobsCompleted??0),0);
       const totalMissed=companyTotals?.missedSameDay??techs.reduce((s,t)=>s+(t.missedSameDay??0),0);
-      return`${totalMissed} missed (of ${totalJobs} jobs)`;
+      return`${totalMissed} missed (of ${totalJobs} visits)`;
     }
     return null;
   }
@@ -339,6 +339,7 @@ function Dashboard({data,onBack}){
           ))}
         </div>
       </div>
+      <div style={{gridColumn:"1/-1",color:C.tan,fontSize:12}}>Jobs count each original work order once; linked stages and corrective visits do not add jobs. {companyTotals?.unclassifiedJobs>0&&`${companyTotals.unclassifiedJobs} unlabelled jobs are included and need review.`}</div>
       {CATEGORIES.map(cat=><DashboardCard key={cat.key} category={cat} techs={techs} companyTotals={companyTotals}/>)}
     </div>
   </div>);
@@ -373,6 +374,8 @@ function SetupScreen({onGenerate}){
       const merged=mergeData(hcpData.data,sheetsData.data,slackData.data);
       const companyTotals={
         jobsCompleted: hcpData.companyJobsCompleted ?? 0,
+        completedVisits: hcpData.companyCompletedVisits ?? 0,
+        unclassifiedJobs: hcpData.companyUnclassifiedJobs ?? 0,
         callbacks:     sheetsData.totalCallbackJobs ?? 0,
         reviews:       sheetsData.totalReviews ?? 0,
         missedSameDay: hcpData.companyMissedSameDay ?? 0,
